@@ -1,5 +1,5 @@
 .env
-data/
+/data/
 *.db
 *.db-wal
 *.db-shm
@@ -7,7 +7,7 @@ __pycache__/
 .pytest_cache/
 *.egg-info/
 .venv/
-logs/
+/logs/
 *.keystore
 *.jks
 android/local.properties

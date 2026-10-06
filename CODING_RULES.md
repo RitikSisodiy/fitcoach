@@ -64,5 +64,6 @@ Update it when you learn something reusable (add it under "Lessons"). Keep it sh
   - The laptop JVM needs `-Djava.net.preferIPv4Stack=true`, otherwise Gradle downloads time out.
   - Compose 1.12+ needs `compileSdk 37`.
   - Files sent to the chat are capped at 30 MB. Ship the R8 release APK (~3.4 MB), not debug (~39 MB).
+- Anchor `.gitignore` paths to the root (`/data/`, not `data/`). The unanchored `data/` silently excluded `android/.../data/` and broke the first CI build. Check `git status` for missing source files before pushing.
 - Release signing must never change, or in-place updates fail. Keep the keystore backup (`~/.fitcoach-signing/` on the laptop) safe.
 - After editing the same file in both places (cloud copy and laptop copy), compare checksums (`md5sum`) so the two never drift.
