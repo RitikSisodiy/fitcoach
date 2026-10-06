@@ -24,7 +24,7 @@ import com.fitcoach.app.data.Store
 import com.fitcoach.app.data.dbl
 import com.fitcoach.app.data.str
 import com.fitcoach.app.engine.NotificationParser
-import com.fitcoach.app.notify.Notifier
+import com.fitcoach.app.telegram.Delivery
 import com.google.android.gms.location.ActivityRecognition
 import com.google.android.gms.location.ActivityTransition
 import com.google.android.gms.location.ActivityTransitionRequest
@@ -158,7 +158,7 @@ class GeofenceReceiver : BroadcastReceiver() {
                 val now = Instant.now()
                 tags.forEach { app.service().onPlaceEvent(it, entered, now, now) }
                 // An arrival can be the moment a rule matters; let the brain decide right away.
-                if (entered) app.service().tick(now).forEach { Notifier.show(context, it) }
+                if (entered) app.service().tick(now).forEach { Delivery.deliver(context, it) }
                 app.notifyDataChanged()
             } finally {
                 pending.finish()
@@ -182,7 +182,10 @@ class FoodNotificationListener : NotificationListenerService() {
         try {
             val app = FitCoachApp.instance
             val status = NotificationParser.ingest(app.store, pkg, title, text, Instant.ofEpochMilli(sbn.postTime), Instant.now())
-            if (status.startsWith("stored")) app.notifyDataChanged()
+            if (status.startsWith("stored")) {
+                app.store.addObservation(Instant.ofEpochMilli(sbn.postTime), "payment_or_order", "notification from $pkg: ${status.substringAfter(':').substringBefore(':')}")
+                app.notifyDataChanged()
+            }
         } catch (e: Exception) {
             Log.w("FitCoach", "notification parse failed", e)
         }

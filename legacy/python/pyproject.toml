@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fitness-coach"
-version = "0.1.0"
+version = "0.3.0"
 description = "A low-effort, proactive, behaviour-aware personal fitness coach."
 requires-python = ">=3.11"
 dependencies = [

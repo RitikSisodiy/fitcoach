@@ -1,0 +1,16 @@
+{
+ "type": "object",
+ "properties": {
+  "act": {"type": "boolean", "description": "true = send a message now"},
+  "reason": {"type": "string", "description": "one or two sentences: why act now, or why silence"},
+  "intent": {"type": "string", "description": "short snake_case label of what this message is for, e.g. commitment_walk, meal_check, plan_ahead, reengage, weekly_reflection, ask_missing_info"},
+  "commitment_id": {"type": "integer", "description": "id of the commitment this message is about, if any"},
+  "message": {"type": "string"},
+  "quick_replies": {"type": "array", "items": {"type": "string"}},
+  "channel": {"type": "string", "enum": ["notification", "telegram"]},
+  "expected_outcome": {"type": "string"},
+  "next_check_minutes": {"type": "integer", "description": "when to look again, 15 to 720"},
+  "next_check_reason": {"type": "string", "description": "what you will be looking for then"}
+ },
+ "required": ["act", "reason", "next_check_minutes", "next_check_reason"]
+}

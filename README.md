@@ -2,7 +2,7 @@
 
 > New session? Read `CODING_RULES.md`, then `docs/CONTEXT.md` and `docs/PROGRESS.md`.
 
-**v1.0: Android app, no server.** The main product is now the native app in `android/` (see `docs/ANDROID.md`). It reads steps, sleep, workouts, walks, saved places, UPI/food-order notifications, calendar and screen time on the phone itself. Chat happens inside the app, and Gemini is called directly with your own key. The Python code below is the reference engine and simulator, and it is also the source of the app's prompts (`tools/export_prompts.py`).
+**v2: an autonomous coaching agent on your phone.** `android/` is the whole product: there is no server. Chat with it in the app or on Telegram; it remembers what you say, watches what your phone can see (steps, sleep, walks, places, UPI/food orders, calendar, screen time), decides on its own when a message would help and when to stay quiet, and learns from what you answer and ignore. See `docs/AGENT.md` and the dashboard tab. The old Python engine is archived in `legacy/python/`.
 
 A personal, proactive AI fitness coach. In the Python reference version it runs over Telegram. Talk to it normally (Hinglish is fine) and it does the tracking. It remembers the commitments you set, reminds you at the moments that matter, offers smaller versions instead of all-or-nothing, and learns which reminders actually work for you.
 

@@ -20,11 +20,9 @@ data class Engagement(
     val recentSent: Int,
     val dailyBudget: Int,
     val minDaysBetween: Int,
-    val allowedIntents: Set<String>?, // null = all
     val intentStats: Map<String, IntentStat> = emptyMap(),
     val retiredIntents: Set<String> = emptySet(),
     val bestHours: List<Int> = emptyList(),
-    val recapEveryDays: Int = 1,
 ) {
     data class IntentStat(var sent: Int = 0, var responded: Int = 0, var lastSent: String? = null, var lastResponded: String? = null)
 
@@ -36,7 +34,6 @@ data class Engagement(
         .put("retired_message_types", JSONArray(retiredIntents.sorted()))
         .put("intent_response_rates", JSONObject(intentStats.filterValues { it.sent > 0 }.mapValues { "${it.value.responded}/${it.value.sent}" }))
         .put("hours_user_usually_replies", JSONArray(bestHours))
-        .put("recap_every_days", recapEveryDays)
 
     companion object {
         val PROACTIVE_KINDS = setOf("scheduled", "follow_up", "proactive", "review")
@@ -44,7 +41,7 @@ data class Engagement(
         const val RESPONSE_WINDOW_HOURS = 3L
         const val RETIRE_AFTER_SENDS = 6
         const val RETIRE_DAYS = 7L
-        val NEVER_RETIRE = setOf("reengage", "weekly_review", "recap")
+        val NEVER_RETIRE = emptySet<String>()
 
         fun intentFamily(intent: String?): String = (intent ?: "unknown").substringBefore(':')
 
@@ -83,12 +80,6 @@ data class Engagement(
                     if (Duration.between(last, now) < Duration.ofDays(RETIRE_DAYS)) retired += fam
                 }
             }
-            var ignoredRecaps = 0
-            for (r in judged.filter { intentFamily(it.str("intent")) == "recap" }.reversed()) {
-                if (responded(r, inbound)) break
-                ignoredRecaps++
-            }
-            val recapEvery = if (ignoredRecaps < 4) 1 else if (ignoredRecaps < 8) 2 else 3
             val hours = inbound.groupingBy { it.atZone(store.tz).hour }.eachCount()
             val bestHours = hours.entries.sortedByDescending { it.value }.take(3).map { it.key }
 
@@ -99,13 +90,14 @@ data class Engagement(
                 daysSince <= 10 -> "silent"
                 else -> "dormant"
             }
-            val (budget, gap, allowed) = when (state) {
-                "engaged" -> Triple(modeBudget, 0, null)
-                "drifting" -> Triple(minOf(modeBudget, 2), 0, null)
-                "silent" -> Triple(minOf(modeBudget, 1), 0, setOf("recap", "reengage", "commitment", "predicted_context"))
-                else -> Triple(minOf(modeBudget, 1), if ((daysSince ?: 0.0) <= 21) 3 else 7, setOf("reengage"))
+            // Rate limits only: the quieter the user, the fewer messages are allowed. What to say is the agent's call.
+            val (budget, gap) = when (state) {
+                "engaged" -> modeBudget to 0
+                "drifting" -> minOf(modeBudget, 2) to 0
+                "silent" -> minOf(modeBudget, 1) to 0
+                else -> minOf(modeBudget, 1) to if ((daysSince ?: 0.0) <= 21) 3 else 7
             }
-            return Engagement(state, daysSince, rate, last8.size, budget, gap, allowed, stats, retired, bestHours, recapEvery)
+            return Engagement(state, daysSince, rate, last8.size, budget, gap, stats, retired, bestHours)
         }
     }
 }

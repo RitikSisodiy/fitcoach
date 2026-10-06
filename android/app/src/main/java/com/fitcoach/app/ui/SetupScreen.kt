@@ -87,6 +87,7 @@ fun SetupScreen(app: FitCoachApp) {
     var places by remember { mutableStateOf(listOf<String>()) }
     var mode by remember { mutableStateOf("normal") }
     var paused by remember { mutableStateOf(false) }
+    var quiet by remember { mutableStateOf("") }
 
     LaunchedEffect(version, refresh) {
         hcGranted = runCatching { HealthSync.granted(ctx).size }.getOrDefault(0)
@@ -94,6 +95,7 @@ fun SetupScreen(app: FitCoachApp) {
             places = app.store.places().map { "${it.str("tag")} (${it.str("label")})" }
             val p = app.store.profile()
             mode = p.optString("coaching_mode", "normal")
+            if (quiet.isEmpty()) quiet = "${p.optString("quiet_start", "22:30")}-${p.optString("quiet_end", "07:30")}"
             paused = p.strOrNull("paused_until")?.let { Instant.parse(it).isAfter(Instant.now()) } ?: false
         }
     }
@@ -110,6 +112,8 @@ fun SetupScreen(app: FitCoachApp) {
                 visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
             Button(onClick = { app.apiKey = key; bump() }) { Text(if (app.apiKey == null) "Save" else "Update") }
         }
+
+        TelegramSection(app)
 
         Section("2. Let the coach see what the phone sees") {
             PermRow("Notifications (coach messages)", Notifier.canPost(ctx)) {
@@ -196,7 +200,17 @@ fun SetupScreen(app: FitCoachApp) {
                     FilterChip(selected = mode == m, onClick = { scope.launch(Dispatchers.IO) { app.service().setMode(Instant.now(), m); bump() } }, label = { Text(m) })
                 }
             }
-            Text("Strong accountability can be switched on by asking the coach in chat (it asks you to confirm).", style = MaterialTheme.typography.bodySmall)
+            Text("For stricter coaching, just ask the coach in chat.", style = MaterialTheme.typography.bodySmall)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(quiet, { quiet = it }, Modifier.weight(1f), label = { Text("Never message me between (HH:MM-HH:MM)") }, singleLine = true)
+                TextButton(onClick = {
+                    val parts = quiet.split("-").map { it.trim() }
+                    val ok = parts.size == 2 && parts.all { runCatching { com.fitcoach.app.core.TimeUtil.hhmm(it) }.isSuccess }
+                    if (ok) scope.launch(Dispatchers.IO) {
+                        app.store.setProfile(Instant.now(), "quiet_start", parts[0]); app.store.setProfile(Instant.now(), "quiet_end", parts[1]); bump()
+                    }
+                }) { Text("Save") }
+            }
             if (paused) Button(onClick = { scope.launch(Dispatchers.IO) { app.service().resume(Instant.now()); bump() } }) { Text("Resume coach") }
             else OutlinedButton(onClick = { scope.launch(Dispatchers.IO) { app.service().pause(Instant.now(), 3.0); bump() } }) { Text("Pause for 3 days") }
         }

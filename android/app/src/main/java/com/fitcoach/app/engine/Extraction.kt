@@ -29,7 +29,10 @@ data class ExtractedCommitment(
     var activityKind: String?, val userWords: String?,
 )
 data class CommitmentUpdate(val commitmentId: Long, val outcome: String, val version: String?, val reasonCategory: String?)
-data class Fact(val category: String, val key: String, val value: String, val confidence: Double)
+/** A memory from chat: long-term (no expiry) or temporary (true for [validDays]). */
+data class Fact(val category: String, val key: String, val value: String, val confidence: Double, val validDays: Double? = null) {
+    val temporary: Boolean get() = validDays != null
+}
 data class FoodCorrection(val itemName: String, val newQuantity: Double)
 data class InferredConfirmation(val inferredId: Long, val isFood: Boolean, val label: String?)
 data class DataQuery(val query: String, val days: Int, val offsetDays: Int, val term: String?, val commitmentId: Long?)
@@ -62,7 +65,7 @@ class Extraction {
         .put("context", JSONArray(context.map { it.tag }))
         .put("commitments", JSONArray(commitments.map { it.title }))
         .put("commitment_updates", JSONArray(commitmentUpdates.map { "${it.commitmentId}:${it.outcome}" }))
-        .put("facts", JSONArray(facts.map { "${it.category}:${it.key}" }))
+        .put("memories", JSONArray(facts.map { (if (it.temporary) "temporary " else "") + "${it.category}:${it.key}=${it.value}" }))
         .put("lapse", lapse)
         .put("food_corrections", JSONArray(foodCorrections.map { "${it.itemName}->${it.newQuantity}" }))
         .put("profile_updates", JSONArray(profileUpdates.keys))
@@ -72,7 +75,7 @@ class Extraction {
 object ExtractionValidator {
     const val MIN_CONFIDENCE = 0.35
     val REASONS = setOf("cannot", "forgot", "dont_want", "too_hard", "bad_timing", "unknown")
-    val FACT_CATEGORIES = setOf("preference", "constraint", "routine", "goal", "pattern", "health", "other")
+    val FACT_CATEGORIES = setOf("preference", "constraint", "routine", "schedule", "goal", "health", "life_event", "other")
     val COMMITMENT_KINDS = setOf("if_then", "habit", "precommitment", "boundary")
     private val TOKEN = Regex("[a-z0-9]+(?:\\.[0-9]+)?")
 
@@ -102,7 +105,12 @@ object ExtractionValidator {
 
     private fun conf(o: JSONObject, k: String = "confidence", default: Double = 0.6) = (o.numOrNull(k) ?: default).coerceIn(0.0, 1.0)
 
-    fun validate(raw: JSONObject?, activeIds: Set<Long>, message: String?, aliasesFor: (String) -> List<String> = { emptyList() }): Extraction {
+    /**
+     * [usualFoods]: lower-case names from the user's usual meals. Items marked from_usual_meal may come from there when the
+     * message says the meal was as usual ("same as always"), even though the food name itself is not in the message.
+     */
+    fun validate(raw: JSONObject?, activeIds: Set<Long>, message: String?, aliasesFor: (String) -> List<String> = { emptyList() },
+                 usualFoods: Set<String> = emptySet()): Extraction {
         val out = Extraction()
         if (raw == null) { out.dropped += "extraction was not an object"; return out }
         fun check(item: JSONObject, what: String): Boolean {
@@ -114,7 +122,8 @@ object ExtractionValidator {
         for (item in raw.arr("food_items").objects()) {
             val name = item.strOrNull("name")?.trim() ?: continue
             if (!check(item, "food '$name'")) continue
-            if (!foodMentioned(name, message, aliasesFor(name))) { out.dropped += "food '$name': not mentioned in the message"; continue }
+            val fromUsual = item.boolOr("from_usual_meal") && name.lowercase() in usualFoods
+            if (!fromUsual && !foodMentioned(name, message, aliasesFor(name))) { out.dropped += "food '$name': not mentioned in the message"; continue }
             val c = conf(item)
             if (c < MIN_CONFIDENCE) { out.dropped += "food '$name' below confidence"; continue }
             var qty = item.numOrNull("quantity")
@@ -193,11 +202,13 @@ object ExtractionValidator {
             out.commitmentUpdates += CommitmentUpdate(id, outcome, u.strOrNull("version")?.take(120), u.strOrNull("reason_category").takeIf { it in REASONS })
         }
 
-        for (f in raw.arr("facts").objects()) {
+        for (f in raw.arr("memories").objects()) {
             val key = f.strOrNull("key") ?: continue; val value = f.strOrNull("value") ?: continue
+            if (!check(f, "memory '$key'")) continue
             val c = conf(f)
             if (c < 0.5) continue
-            out.facts += Fact(f.strOrNull("category").takeIf { it in FACT_CATEGORIES } ?: "other", key.take(48), value.take(300), c)
+            val days = if (f.strOrNull("type") == "temporary") (f.numOrNull("valid_days") ?: 3.0).coerceIn(0.1, 60.0) else null
+            out.facts += Fact(f.strOrNull("category").takeIf { it in FACT_CATEGORIES } ?: "other", key.take(48), value.take(300), c, days)
         }
 
         for (c in raw.arr("food_corrections").objects()) {

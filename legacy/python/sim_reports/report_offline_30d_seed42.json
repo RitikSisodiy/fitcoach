@@ -4,12 +4,12 @@
   "tracking": {
     "main_meals_truth": 90,
     "main_meals_captured_by_source": {
-      "user_entered": 21,
-      "missing": 63,
-      "default_confirmed": 3,
+      "user_entered": 20,
+      "missing": 61,
+      "default_confirmed": 6,
       "inferred_unconfirmed": 3
     },
-    "main_meal_capture_pct": 30,
+    "main_meal_capture_pct": 32,
     "street_food_events_truth": 12,
     "street_food_days_captured": 9,
     "food_orders_truth": 8,
@@ -35,11 +35,11 @@
         "n": 1
       }
     ],
-    "kcal_mape_on_fully_covered_days": 0,
-    "fully_covered_days": 1,
+    "kcal_mape_on_fully_covered_days": 11,
+    "fully_covered_days": 2,
     "days_with_intake_estimate_incl_assumed": 30,
-    "intake_estimate_mape_pct": 5,
-    "intake_estimate_bias_pct": 0,
+    "intake_estimate_mape_pct": 6,
+    "intake_estimate_bias_pct": 1,
     "steps_days_with_data": 30,
     "walk_days_truth": 8,
     "walk_days_recorded": 7
@@ -47,12 +47,12 @@
   "understanding": {
     "patterns": [
       {
-        "claim": "lunch is rarely logged (3 of 13 active days)",
+        "claim": "lunch is rarely logged (3 of 14 active days)",
         "status": "active",
         "first_seen": "2026-09-13"
       },
       {
-        "claim": "breakfast is rarely logged (3 of 13 active days)",
+        "claim": "breakfast is rarely logged (4 of 14 active days)",
         "status": "candidate",
         "first_seen": "2026-09-16"
       },
@@ -62,8 +62,8 @@
         "first_seen": "2026-09-20"
       },
       {
-        "claim": "'long_workday' usually happens on mon around 17:10 (2 of 3 mons)",
-        "status": "candidate",
+        "claim": "'long_workday' usually happens on mon around 17:10 (3 of 3 mons)",
+        "status": "active",
         "first_seen": "2026-09-22"
       },
       {
@@ -87,11 +87,6 @@
         "first_seen": "2026-10-03"
       },
       {
-        "claim": "On 'long_workday' days, off-plan eating happened 2 of 6 times (usually samosa, burger)",
-        "status": "candidate",
-        "first_seen": "2026-09-22"
-      },
-      {
         "claim": "'long_workday' usually happens on tue around 17:10 (1 of 2 tues)",
         "status": "candidate",
         "first_seen": "2026-09-23"
@@ -105,6 +100,11 @@
         "claim": "'long_workday' usually happens on thu around 17:10 (1 of 2 thus)",
         "status": "candidate",
         "first_seen": "2026-10-02"
+      },
+      {
+        "claim": "On 'long_workday' days, off-plan eating happened 2 of 7 times (usually burger, samosa)",
+        "status": "candidate",
+        "first_seen": "2026-09-22"
       },
       {
         "claim": "'chess' usually happens on tue around 18:00 (1 of 3 tues)",
@@ -127,26 +127,26 @@
   "coaching": {
     "proactive_by_intent": {
       "onboarding": 2,
-      "recap": 24,
+      "recap": 25,
       "morning_plan": 18,
       "commitment": 22,
       "weekly_review": 4,
       "propose_commitment": 1,
       "predicted_context": 1
     },
-    "pre_emptive_chess_messages": 1,
+    "pre_emptive_chess_messages": 2,
     "proactive_per_day_by_week": {
       "1": 2.29,
       "2": 2.57,
       "3": 2.43,
-      "4": 2.43,
+      "4": 2.57,
       "5": 2.0
     },
     "response_rate_by_week": {
       "1": "10/16",
       "2": "6/18",
-      "3": "5/17",
-      "4": "6/17",
+      "3": "6/17",
+      "4": "7/18",
       "5": "1/4"
     },
     "engagement_states": {
@@ -197,12 +197,12 @@
     "tone_or_safety_violations": 0,
     "messages_in_quiet_hours": 0
   },
-  "llm_calls": 170,
+  "llm_calls": 172,
   "sample_messages": [
     {
       "at": "2026-09-07T10:00:00+05:30",
-      "text": "[onboarding] Profile is missing basics the coach needs",
-      "intent": "onboarding",
+      "text": "[onboarding:usual_meals] Profile is missing basics the coach needs",
+      "intent": "onboarding:usual_meals",
       "buttons": []
     },
     {
@@ -241,8 +241,8 @@
     },
     {
       "at": "2026-09-09T10:00:00+05:30",
-      "text": "[onboarding] Profile is missing basics the coach needs",
-      "intent": "onboarding",
+      "text": "[onboarding:first_habit] Profile is missing basics the coach needs",
+      "intent": "onboarding:first_habit",
       "buttons": []
     },
     {

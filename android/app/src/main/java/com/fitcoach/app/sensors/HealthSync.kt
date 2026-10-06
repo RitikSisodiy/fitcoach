@@ -73,14 +73,20 @@ object HealthSync {
                 if (minutes in 60.0..(16 * 60.0)) {
                     // Anchored on the wake-up time: the night belongs to the morning it ends.
                     if (store.upsertHealth(now, "sleep_min", "sleep|${r.metadata.id}", r.startTime, r.endTime, r.endTime, minutes,
-                            JSONObject().put("minutes", minutes))) n++
+                            JSONObject().put("minutes", minutes))) {
+                        n++
+                        store.addObservation(r.endTime, "sleep", "slept %.1f h, woke at %s".format(minutes / 60, TimeUtil.fmtHhmm(TimeUtil.localTime(r.endTime, store.tz))), significant = false)
+                    }
                 }
             }
         }
         if (HealthPermission.getReadPermission(WeightRecord::class) in granted) {
             client.readRecords(ReadRecordsRequest(WeightRecord::class, TimeRangeFilter.after(since.minus(Duration.ofDays(23))))).records.forEach { r ->
                 val kg = r.weight.inKilograms
-                if (kg in 30.0..300.0 && store.upsertHealth(now, "weight_kg", "weight|${r.metadata.id}", r.time, r.time, r.time, kg, JSONObject().put("kg", kg))) n++
+                if (kg in 30.0..300.0 && store.upsertHealth(now, "weight_kg", "weight|${r.metadata.id}", r.time, r.time, r.time, kg, JSONObject().put("kg", kg))) {
+                    n++
+                    store.addObservation(r.time, "weigh_in", "weighed %.1f kg (Health Connect)".format(kg))
+                }
             }
         }
         if (HealthPermission.getReadPermission(ExerciseSessionRecord::class) in granted) {
@@ -88,7 +94,10 @@ object HealthSync {
                 val minutes = Duration.between(r.startTime, r.endTime).toMinutes().toDouble()
                 val type = exerciseName(r.exerciseType)
                 if (minutes in 3.0..600.0 && store.upsertHealth(now, "exercise", "exercise|${r.metadata.id}", r.startTime, r.endTime, r.startTime, minutes,
-                        JSONObject().put("type", type).put("title", r.title ?: JSONObject.NULL).put("source", "health_connect"))) n++
+                        JSONObject().put("type", type).put("title", r.title ?: JSONObject.NULL).put("source", "health_connect"))) {
+                    n++
+                    store.addObservation(r.endTime, "exercise", "$type ${minutes.toInt()} min (Health Connect)")
+                }
             }
         }
         return "health sync: $n new/updated rows"

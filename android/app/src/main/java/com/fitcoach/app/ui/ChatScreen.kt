@@ -59,7 +59,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.time.Instant
 
-private data class ChatItem(val id: Long, val incoming: Boolean, val text: String, val time: String, val buttons: List<Pair<String, String>>)
+private data class ChatItem(val id: Long, val incoming: Boolean, val text: String, val time: String, val channel: String, val quickReplies: List<String>)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -75,12 +75,15 @@ fun ChatScreen(app: FitCoachApp) {
 
     LaunchedEffect(version) {
         items = withContext(Dispatchers.IO) {
-            app.store.allMessages(300).map { r ->
-                val bj = r.str("buttons_json")?.let { JSONArray(it) }
+            val rows = app.store.allMessages(300)
+            val lastId = rows.lastOrNull()?.long("id")
+            rows.map { r ->
+                // Quick replies only make sense on the latest message; older ones are history.
+                val bj = r.str("buttons_json")?.takeIf { r.long("id") == lastId }?.let { JSONArray(it) }
                 ChatItem(
                     r.long("id")!!, r.str("direction") == "in", r.str("text") ?: "",
-                    app.store.fmtLocal(TimeUtil.parse(r.str("created_at")!!), "dd MMM HH:mm"),
-                    if (bj == null) emptyList() else (0 until bj.length()).map { bj.getJSONObject(it).let { o -> o.getString("label") to o.getString("data") } },
+                    app.store.fmtLocal(TimeUtil.parse(r.str("created_at")!!), "dd MMM HH:mm"), r.str("channel") ?: "app",
+                    if (bj == null) emptyList() else (0 until bj.length()).map { bj.getJSONObject(it).getString("label") },
                 )
             }
         }
@@ -112,15 +115,13 @@ fun ChatScreen(app: FitCoachApp) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp), state = listState, verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (items.isEmpty()) item {
                 Text(
-                    "Talk to your coach like a friend: \"2 roti dal sabzi khaya\", \"chess ja raha hu\", \"aaj walk skip\". " +
-                        "Photos and voice notes work too. The coach also watches your steps, sleep, places and food orders on its own.",
+                    "Talk to your coach like you would to a friend - what you ate, where you're going, what you want to change. " +
+                        "Photos and voice notes work too. It remembers what you tell it, watches your steps, sleep, places and " +
+                        "food orders on its own, and messages you here, in notifications or on Telegram when it matters.",
                     Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium,
                 )
             }
-            items(items, key = { it.id }) { m -> Bubble(m) { data -> scope.launch {
-                withContext(Dispatchers.IO) { app.service().handleButton(data, Instant.now(), m.id) }
-                app.notifyDataChanged()
-            } } }
+            items(items, key = { it.id }) { m -> Bubble(m) { reply -> submit(reply) } }
             if (busy) item { Text("Coach is thinking…", Modifier.padding(8.dp), style = MaterialTheme.typography.labelMedium) }
         }
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -148,7 +149,7 @@ fun ChatScreen(app: FitCoachApp) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Bubble(m: ChatItem, onButton: (String) -> Unit) {
+private fun Bubble(m: ChatItem, onReply: (String) -> Unit) {
     Box(Modifier.fillMaxWidth(), contentAlignment = if (m.incoming) Alignment.CenterEnd else Alignment.CenterStart) {
         Column(
             Modifier.widthIn(max = 320.dp)
@@ -159,9 +160,10 @@ private fun Bubble(m: ChatItem, onButton: (String) -> Unit) {
                 .padding(10.dp),
         ) {
             Text(m.text, style = MaterialTheme.typography.bodyMedium)
-            Text(m.time, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (m.buttons.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                m.buttons.forEach { (label, data) -> AssistChip(onClick = { onButton(data) }, label = { Text(label) }) }
+            Text(m.time + if (m.channel == "telegram") " · Telegram" else if (m.channel == "notification") " · notification" else "",
+                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (m.quickReplies.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                m.quickReplies.forEach { label -> AssistChip(onClick = { onReply(label) }, label = { Text(label) }) }
             }
         }
     }

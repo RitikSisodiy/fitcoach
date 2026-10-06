@@ -3,8 +3,6 @@ package com.fitcoach.app.engine
 /** Deterministic guard on every outgoing coach message (port of coach/engine/safety.py). */
 object Safety {
     const val MIN_SAFE_DAILY_KCAL = 1200
-    const val SAFE_FALLBACK_REPLY = "Noted. The next decision is the one that matters - want to keep it simple and stick to the plan for the next meal?"
-    const val LLM_DOWN_REPLY = "Saved. My AI side is having trouble right now, so I'll keep it short - I'll catch up once it's back."
 
     private val SHAME = listOf(
         "\\blazy\\b", "\\bfailed again\\b", "\\byou failed\\b", "\\bno discipline\\b", "\\black of discipline\\b",

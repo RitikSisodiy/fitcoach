@@ -13,7 +13,8 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.fitcoach.app.FitCoachApp
-import com.fitcoach.app.notify.Notifier
+import com.fitcoach.app.telegram.Delivery
+import com.fitcoach.app.telegram.Telegram
 import com.fitcoach.app.sensors.ActivityTracker
 import com.fitcoach.app.sensors.CalendarReader
 import com.fitcoach.app.sensors.HealthSync
@@ -40,7 +41,7 @@ object Scheduler {
     }
 }
 
-/** One coach tick: read the phone's sensors, then let the brain decide on at most one message. */
+/** One pass of the agent loop: read the phone's sensors, then let the agent decide (see CoachService.tick). */
 class TickWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result {
         val app = FitCoachApp.instance
@@ -57,7 +58,8 @@ class TickWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, 
             app.store.logDecision(now, "tick_error", "${e.javaClass.simpleName}: ${e.message}".take(300))
             emptyList()
         }
-        out.forEach { Notifier.show(applicationContext, it) }
+        out.forEach { Delivery.deliver(applicationContext, it) }
+        Telegram.ensureRunning(applicationContext)
         Updater.check(applicationContext)
         app.notifyDataChanged()
         return Result.success()
@@ -70,5 +72,6 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Scheduler.ensureScheduled(context)
         Scheduler.runNow(context)
+        Telegram.ensureRunning(context)
     }
 }

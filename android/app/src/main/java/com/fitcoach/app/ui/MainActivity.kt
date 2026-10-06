@@ -70,7 +70,7 @@ private fun Root(app: FitCoachApp) {
     Scaffold(
         bottomBar = {
             NavigationBar {
-                listOf("Chat", "Today", "Setup").forEachIndexed { i, label ->
+                listOf("Chat", "Dashboard", "Setup").forEachIndexed { i, label ->
                     NavigationBarItem(selected = tab == i, onClick = { tab = i }, icon = { Text(listOf("💬", "📊", "⚙️")[i]) }, label = { Text(label) })
                 }
             }
@@ -81,7 +81,7 @@ private fun Root(app: FitCoachApp) {
             Box(Modifier.weight(1f)) {
                 when (tab) {
                     0 -> ChatScreen(app)
-                    1 -> TodayScreen(app)
+                    1 -> DashboardScreen(app)
                     else -> SetupScreen(app)
                 }
             }

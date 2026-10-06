@@ -1,0 +1,291 @@
+{
+  "mode": "offline",
+  "days": 30,
+  "tracking": {
+    "main_meals_truth": 90,
+    "main_meals_captured_by_source": {
+      "default_confirmed": 3,
+      "user_entered": 16,
+      "missing": 63,
+      "inferred_unconfirmed": 8
+    },
+    "main_meal_capture_pct": 30,
+    "street_food_events_truth": 11,
+    "street_food_days_captured": 10,
+    "food_orders_truth": 10,
+    "inferred_events": [
+      {
+        "kind": "food_order",
+        "status": "auto_logged",
+        "n": 10
+      },
+      {
+        "kind": "small_payment",
+        "status": "auto_confirmed",
+        "n": 5
+      },
+      {
+        "kind": "small_payment",
+        "status": "confirmed",
+        "n": 1
+      },
+      {
+        "kind": "small_payment",
+        "status": "expired",
+        "n": 5
+      }
+    ],
+    "kcal_mape_on_fully_covered_days": 17,
+    "fully_covered_days": 3,
+    "days_with_intake_estimate_incl_assumed": 30,
+    "intake_estimate_mape_pct": 9,
+    "intake_estimate_bias_pct": 8,
+    "steps_days_with_data": 30,
+    "walk_days_truth": 10,
+    "walk_days_recorded": 5
+  },
+  "understanding": {
+    "patterns": [
+      {
+        "claim": "breakfast is rarely logged (2 of 8 active days)",
+        "status": "active",
+        "first_seen": "2026-09-14"
+      },
+      {
+        "claim": "lunch is rarely logged (3 of 11 active days)",
+        "status": "candidate",
+        "first_seen": "2026-09-22"
+      },
+      {
+        "claim": "Small payments to sharma chaat corner on sats around 18:40 (4 of 4) - likely a snack stop",
+        "status": "active",
+        "first_seen": "2026-09-20"
+      },
+      {
+        "claim": "Small payments to sharma chaat corner on tues around 18:40 (3 of 3) - likely a snack stop",
+        "status": "active",
+        "first_seen": "2026-09-23"
+      },
+      {
+        "claim": "On 'chess' days, off-plan eating happened 2 of 3 times (usually street snack)",
+        "status": "candidate",
+        "first_seen": "2026-09-23"
+      },
+      {
+        "claim": "'chess' usually happens on tue around 18:00 (2 of 4 tues)",
+        "status": "candidate",
+        "first_seen": "2026-09-09"
+      },
+      {
+        "claim": "'long_workday' usually happens on fri around 17:10 (2 of 4 fris)",
+        "status": "candidate",
+        "first_seen": "2026-09-12"
+      },
+      {
+        "claim": "'long_workday' usually happens on tue around 17:10 (1 of 3 tues)",
+        "status": "candidate",
+        "first_seen": "2026-09-23"
+      },
+      {
+        "claim": "'long_workday' usually happens on thu around 17:10 (1 of 3 thus)",
+        "status": "candidate",
+        "first_seen": "2026-09-25"
+      },
+      {
+        "claim": "'chess' usually happens on sat around 18:00 (1 of 4 sats)",
+        "status": "candidate",
+        "first_seen": "2026-09-27"
+      },
+      {
+        "claim": "'long_workday' usually happens on mon around 17:10 (1 of 4 mons)",
+        "status": "candidate",
+        "first_seen": "2026-10-06"
+      },
+      {
+        "claim": "On 'long_workday' days, off-plan eating happened 1 of 5 times (usually street snack)",
+        "status": "candidate",
+        "first_seen": "2026-09-23"
+      }
+    ],
+    "chess_days": 9
+  },
+  "coaching": {
+    "proactive_by_intent": {
+      "onboarding": 2,
+      "recap": 22,
+      "morning_plan": 15,
+      "commitment": 22,
+      "weekly_review": 4,
+      "propose_commitment": 1,
+      "predicted_context": 2
+    },
+    "pre_emptive_chess_messages": 2,
+    "proactive_per_day_by_week": {
+      "1": 2.43,
+      "2": 2.43,
+      "3": 2.29,
+      "4": 1.86,
+      "5": 2.5
+    },
+    "response_rate_by_week": {
+      "1": "8/17",
+      "2": "6/17",
+      "3": "3/16",
+      "4": "3/13",
+      "5": "1/5"
+    },
+    "engagement_states": {
+      "engaged": 28,
+      "drifting": 2
+    },
+    "engagement_timeline": [
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "D",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "D",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E"
+    ],
+    "retired_types_seen": [],
+    "commitments": [
+      {
+        "id": 1,
+        "title": "Evening walk",
+        "status": "active"
+      }
+    ]
+  },
+  "safety": {
+    "tone_or_safety_violations": 0,
+    "messages_in_quiet_hours": 0
+  },
+  "llm_calls": 158,
+  "sample_messages": [
+    {
+      "at": "2026-09-07T10:00:00+05:30",
+      "text": "[onboarding:usual_meals] Profile is missing basics the coach needs",
+      "intent": "onboarding:usual_meals",
+      "buttons": []
+    },
+    {
+      "at": "2026-09-07T21:00:00+05:30",
+      "text": "[recap] Evening recap: meals not logged today: breakfast, lunch, dinner; 0 inferred item",
+      "intent": "recap",
+      "buttons": [
+        "All usual",
+        "Usual + outside snack",
+        "Off-plan day",
+        "Skip today"
+      ]
+    },
+    {
+      "at": "2026-09-08T17:00:00+05:30",
+      "text": "[onboarding:first_habit] Profile is missing basics the coach needs",
+      "intent": "onboarding:first_habit",
+      "buttons": []
+    },
+    {
+      "at": "2026-09-08T21:00:00+05:30",
+      "text": "[recap] Evening recap: meals not logged today: breakfast, dinner; 0 inferred item(s) to",
+      "intent": "recap",
+      "buttons": [
+        "All usual",
+        "Usual + outside snack",
+        "Off-plan day",
+        "Skip today"
+      ]
+    },
+    {
+      "at": "2026-09-09T08:30:00+05:30",
+      "text": "[morning_plan] Morning: there is something specific to plan for today",
+      "intent": "morning_plan",
+      "buttons": []
+    },
+    {
+      "at": "2026-09-09T19:15:00+05:30",
+      "text": "[commitment:1] Commitment due now (level 1: routine reminder; timing: slot 19:00 has best sampl",
+      "intent": "commitment:1",
+      "buttons": [
+        "Done",
+        "Smaller version",
+        "Later",
+        "Skip today"
+      ]
+    },
+    {
+      "at": "2026-10-04T21:00:00+05:30",
+      "text": "[recap] Evening recap: meals not logged today: breakfast, lunch, dinner; 0 inferred item",
+      "intent": "recap",
+      "buttons": [
+        "All usual",
+        "Usual + outside snack",
+        "Off-plan day",
+        "Skip today"
+      ]
+    },
+    {
+      "at": "2026-10-05T08:30:00+05:30",
+      "text": "[morning_plan] Morning: there is something specific to plan for today",
+      "intent": "morning_plan",
+      "buttons": []
+    },
+    {
+      "at": "2026-10-05T19:00:00+05:30",
+      "text": "[commitment:1] Commitment due now (level 1: routine reminder; timing: slot 19:00 has best sampl",
+      "intent": "commitment:1",
+      "buttons": [
+        "Done",
+        "Smaller version",
+        "Later",
+        "Skip today"
+      ]
+    },
+    {
+      "at": "2026-10-06T08:30:00+05:30",
+      "text": "[morning_plan] Morning: there is something specific to plan for today",
+      "intent": "morning_plan",
+      "buttons": []
+    },
+    {
+      "at": "2026-10-06T16:45:00+05:30",
+      "text": "[predicted_context:snack_stop_sharma_chaat_corner] 'snack_stop_sharma_chaat_corner' is predicted around 18:40 today; acting before",
+      "intent": "predicted_context:snack_stop_sharma_chaat_corner",
+      "buttons": []
+    },
+    {
+      "at": "2026-10-06T19:00:00+05:30",
+      "text": "[commitment:1] Commitment due now (level 2: 1 consecutive missed day(s): never miss twice; timi",
+      "intent": "commitment:1",
+      "buttons": [
+        "Done",
+        "Smaller version",
+        "Later",
+        "Skip today"
+      ]
+    }
+  ]
+}

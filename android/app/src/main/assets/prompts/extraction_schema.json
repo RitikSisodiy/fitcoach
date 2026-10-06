@@ -1,0 +1,585 @@
+{
+ "type": "object",
+ "properties": {
+  "food_items": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Common dish name in English or romanised Hindi"
+     },
+     "quote": {
+      "type": "string"
+     },
+     "quantity": {
+      "type": "number"
+     },
+     "unit": {
+      "type": "string"
+     },
+     "meal_slot": {
+      "type": "string",
+      "enum": [
+       "breakfast",
+       "lunch",
+       "snack",
+       "dinner",
+       "drink",
+       "unknown"
+      ]
+     },
+     "eaten": {
+      "type": "string",
+      "enum": [
+       "eaten",
+       "planned"
+      ]
+     },
+     "est_kcal_low": {
+      "type": "number"
+     },
+     "est_kcal_high": {
+      "type": "number"
+     },
+     "est_protein_low": {
+      "type": "number"
+     },
+     "est_protein_high": {
+      "type": "number"
+     },
+     "confidence": {
+      "type": "number"
+     },
+     "from_usual_meal": {
+      "type": "boolean",
+      "description": "true when the user said this meal was as usual and the item comes from USUAL_MEALS"
+     }
+    },
+    "required": [
+     "name",
+     "eaten",
+     "confidence"
+    ]
+   }
+  },
+  "activities": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "walk",
+       "workout",
+       "sport",
+       "steps",
+       "other"
+      ]
+     },
+     "description": {
+      "type": "string"
+     },
+     "duration_min": {
+      "type": "number"
+     },
+     "steps": {
+      "type": "number"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "done",
+       "planned"
+      ]
+     },
+     "confidence": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "kind",
+     "status",
+     "confidence"
+    ]
+   }
+  },
+  "body_metrics": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "metric": {
+      "type": "string",
+      "enum": [
+       "weight_kg",
+       "waist_cm"
+      ]
+     },
+     "value": {
+      "type": "number"
+     },
+     "confidence": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "metric",
+     "value",
+     "confidence"
+    ]
+   }
+  },
+  "context": {
+   "type": "array",
+   "description": "Situations, places, or routines the user is in or about to be in.",
+   "items": {
+    "type": "object",
+    "properties": {
+     "tag": {
+      "type": "string",
+      "description": "Short snake_case tag. Reuse a known tag when it fits."
+     },
+     "timing": {
+      "type": "string",
+      "enum": [
+       "now",
+       "planned",
+       "past"
+      ]
+     },
+     "time_hint": {
+      "type": "string",
+      "description": "HH:MM 24h if the user said when (e.g. '6 baje' -> 18:00)"
+     },
+     "day": {
+      "type": "string",
+      "enum": [
+       "today",
+       "tomorrow"
+      ],
+      "description": "for planned: 'kal' = tomorrow"
+     },
+     "description": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "tag",
+     "timing"
+    ]
+   }
+  },
+  "commitments": {
+   "type": "array",
+   "description": "Only rules/plans the user explicitly agrees to or states as their own commitment.",
+   "items": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "if_then",
+       "habit",
+       "precommitment",
+       "boundary"
+      ]
+     },
+     "quote": {
+      "type": "string"
+     },
+     "title": {
+      "type": "string"
+     },
+     "trigger_tag": {
+      "type": "string"
+     },
+     "action": {
+      "type": "string"
+     },
+     "fallback_versions": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "schedule_days": {
+      "type": "string",
+      "description": "daily, weekdays, weekends, or mon,tue,..."
+     },
+     "window_start": {
+      "type": "string",
+      "description": "HH:MM 24h local"
+     },
+     "window_end": {
+      "type": "string",
+      "description": "HH:MM 24h local"
+     },
+     "strong_enforcement_requested": {
+      "type": "boolean"
+     },
+     "activity_kind": {
+      "type": "string",
+      "enum": [
+       "walk",
+       "workout",
+       "food",
+       "other"
+      ]
+     },
+     "user_words": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "kind",
+     "title",
+     "action"
+    ]
+   }
+  },
+  "commitment_updates": {
+   "type": "array",
+   "description": "Progress on an existing commitment (by id) mentioned in this message.",
+   "items": {
+    "type": "object",
+    "properties": {
+     "commitment_id": {
+      "type": "integer"
+     },
+     "outcome": {
+      "type": "string",
+      "enum": [
+       "done",
+       "smaller",
+       "skipped",
+       "postponed"
+      ]
+     },
+     "version": {
+      "type": "string"
+     },
+     "reason_category": {
+      "type": "string",
+      "enum": [
+       "cannot",
+       "forgot",
+       "dont_want",
+       "too_hard",
+       "bad_timing",
+       "unknown"
+      ]
+     }
+    },
+    "required": [
+     "commitment_id",
+     "outcome"
+    ]
+   }
+  },
+  "food_corrections": {
+   "type": "array",
+   "description": "User corrects something logged earlier TODAY (e.g. 'nahi 2 roti thi'). new_quantity 0 = remove it.",
+   "items": {
+    "type": "object",
+    "properties": {
+     "item_name": {
+      "type": "string"
+     },
+     "new_quantity": {
+      "type": "number"
+     },
+     "quote": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "item_name",
+     "new_quantity"
+    ]
+   }
+  },
+  "commitment_changes": {
+   "type": "array",
+   "description": "User changes an ACTIVE_COMMITMENTS item (time, days, size, pause, stop).",
+   "items": {
+    "type": "object",
+    "properties": {
+     "commitment_id": {
+      "type": "integer"
+     },
+     "quote": {
+      "type": "string"
+     },
+     "window_start": {
+      "type": "string"
+     },
+     "window_end": {
+      "type": "string"
+     },
+     "schedule_days": {
+      "type": "string"
+     },
+     "fallback_versions": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "active",
+       "paused",
+       "retired"
+      ]
+     }
+    },
+    "required": [
+     "commitment_id"
+    ]
+   }
+  },
+  "inferred_confirmations": {
+   "type": "array",
+   "description": "Answers about PENDING_INFERRED items (was that payment/order food?). Also list the food itself in food_items.",
+   "items": {
+    "type": "object",
+    "properties": {
+     "inferred_id": {
+      "type": "integer"
+     },
+     "is_food": {
+      "type": "boolean"
+     },
+     "label": {
+      "type": "string"
+     },
+     "quote": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "inferred_id",
+     "is_food"
+    ]
+   }
+  },
+  "goal_weight_kg": {
+   "type": "number",
+   "description": "target weight the user states, e.g. 'mujhe 76 kg tak aana hai' -> 76"
+  },
+  "goal_text": {
+   "type": "string",
+   "description": "the user's goal in a few words"
+  },
+  "goal_quote": {
+   "type": "string",
+   "description": "exact words of the goal from USER_MESSAGE"
+  },
+  "height_cm": {
+   "type": "number"
+  },
+  "usual_meals": {
+   "type": "array",
+   "description": "What the user says they USUALLY eat ('lunch me mostly 3 roti dal sabzi hota hai'). Not a log for today.",
+   "items": {
+    "type": "object",
+    "properties": {
+     "slot": {
+      "type": "string",
+      "enum": [
+       "breakfast",
+       "lunch",
+       "dinner"
+      ]
+     },
+     "quote": {
+      "type": "string"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "quantity": {
+         "type": "number"
+        },
+        "unit": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "name"
+       ]
+      }
+     }
+    },
+    "required": [
+     "slot",
+     "items"
+    ]
+   }
+  },
+  "pattern_feedback": {
+   "type": "array",
+   "description": "User says an observed pattern in KNOWN_PATTERNS is wrong or right.",
+   "items": {
+    "type": "object",
+    "properties": {
+     "pattern_id": {
+      "type": "integer"
+     },
+     "correct": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "pattern_id",
+     "correct"
+    ]
+   }
+  },
+  "data_needed": {
+   "type": "array",
+   "description": "Only if answering the user needs history you were not given. Code will fetch it.",
+   "items": {
+    "type": "object",
+    "properties": {
+     "query": {
+      "type": "string",
+      "enum": [
+       "food_log",
+       "weight",
+       "steps",
+       "sleep",
+       "commitment_history",
+       "patterns",
+       "search_messages"
+      ]
+     },
+     "days": {
+      "type": "integer",
+      "description": "how many days of data"
+     },
+     "offset_days": {
+      "type": "integer",
+      "description": "days back the range ENDS: 0 = up to today, 1 = up to yesterday ('kal')"
+     },
+     "term": {
+      "type": "string"
+     },
+     "commitment_id": {
+      "type": "integer"
+     }
+    },
+    "required": [
+     "query"
+    ]
+   }
+  },
+  "lapse": {
+   "type": "object",
+   "properties": {
+    "detected": {
+     "type": "boolean"
+    },
+    "all_or_nothing_thinking": {
+     "type": "boolean"
+    },
+    "note": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "detected"
+   ]
+  },
+  "coaching_mode_request": {
+   "type": "string",
+   "enum": [
+    "gentle",
+    "normal",
+    "accountability",
+    "strong"
+   ],
+   "description": "ONLY if the user explicitly asks to change how strict the coach is"
+  },
+  "pause_days": {
+   "type": "number",
+   "description": "ONLY if the user asks to pause/stop the coach for some days"
+  },
+  "settings_quote": {
+   "type": "string"
+  },
+  "memories": {
+   "type": "array",
+   "description": "Things worth remembering beyond this message (long_term) or for a limited time (temporary).",
+   "items": {
+    "type": "object",
+    "properties": {
+     "type": {
+      "type": "string",
+      "enum": [
+       "long_term",
+       "temporary"
+      ]
+     },
+     "category": {
+      "type": "string",
+      "enum": [
+       "preference",
+       "constraint",
+       "routine",
+       "schedule",
+       "goal",
+       "health",
+       "life_event",
+       "other"
+      ]
+     },
+     "key": {
+      "type": "string",
+      "description": "short snake_case key; reuse an ACTIVE_MEMORY key to update it"
+     },
+     "value": {
+      "type": "string"
+     },
+     "valid_days": {
+      "type": "number",
+      "description": "temporary only: for how many days this stays true"
+     },
+     "quote": {
+      "type": "string"
+     },
+     "confidence": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "type",
+     "category",
+     "key",
+     "value",
+     "quote",
+     "confidence"
+    ]
+   }
+  }
+ },
+ "required": [
+  "food_items",
+  "activities",
+  "body_metrics",
+  "context",
+  "commitments",
+  "commitment_updates",
+  "memories",
+  "lapse"
+ ]
+}

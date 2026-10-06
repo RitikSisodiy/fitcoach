@@ -137,9 +137,12 @@ class Store(val db: SQLiteDatabase, val tz: ZoneId) {
     }
 
     // ------------------------------------------------------------- messages
-    fun addMessage(now: Instant, direction: String, kind: String, text: String, externalId: String? = null, buttons: JSONArray? = null): Long =
+    fun addMessage(now: Instant, direction: String, kind: String, text: String, externalId: String? = null, buttons: JSONArray? = null,
+                   channel: String = "app", interventionId: Long? = null): Long =
         insert("messages", mapOf("direction" to direction, "kind" to kind, "text" to text, "created_at" to TimeUtil.iso(now),
-            "external_id" to externalId, "buttons_json" to buttons?.toString()))
+            "external_id" to externalId, "buttons_json" to buttons?.toString(), "channel" to channel, "intervention_id" to interventionId))
+
+    fun lastInboundChannel(): String? = one("SELECT channel FROM messages WHERE direction = 'in' ORDER BY id DESC LIMIT 1")?.str("channel")
 
     /** Buttons are one-shot: once one is pressed, the row keeps only the text. */
     fun clearButtons(messageId: Long) = exec("UPDATE messages SET buttons_json = NULL WHERE id = ?", messageId)
@@ -171,24 +174,34 @@ class Store(val db: SQLiteDatabase, val tz: ZoneId) {
         query("SELECT created_at FROM messages WHERE direction = 'in' AND created_at >= ? ORDER BY created_at", sinceIso).mapNotNull { it.str("created_at") }
 
     // ---------------------------------------------------------------- facts
-    fun upsertFact(now: Instant, category: String, rawKey: String, value: String, source: String, confidence: Double, msgId: Long? = null): Long {
+    /**
+     * Memory upsert with supersession: a new value for the same (category, key) replaces the old one.
+     * [validUntil] (ISO instant) marks temporary memory ("knee pain this week"); null = long-term.
+     */
+    fun upsertFact(now: Instant, category: String, rawKey: String, value: String, source: String, confidence: Double, msgId: Long? = null,
+                   validUntil: String? = null): Long {
         val key = normalizeTag(rawKey)
         val cur = one("SELECT * FROM facts WHERE category = ? AND key = ? AND superseded_by IS NULL", category, key)
         if (cur != null && cur.str("value")!!.trim().equals(value.trim(), ignoreCase = true)) {
-            exec("UPDATE facts SET last_verified_at = ?, confidence = MAX(confidence, ?) WHERE id = ?", TimeUtil.iso(now), confidence, cur.long("id"))
+            exec("UPDATE facts SET last_verified_at = ?, confidence = MAX(confidence, ?), valid_until = ? WHERE id = ?",
+                TimeUtil.iso(now), confidence, validUntil, cur.long("id"))
             return cur.long("id")!!
         }
         val id = insert(
             "facts", mapOf(
                 "category" to category, "key" to key, "value" to value, "source" to source, "source_message_id" to msgId,
                 "confidence" to confidence, "created_at" to TimeUtil.iso(now), "last_verified_at" to TimeUtil.iso(now),
+                "valid_until" to validUntil,
             ),
         )
         if (cur != null) exec("UPDATE facts SET superseded_by = ? WHERE id = ?", id, cur.long("id"))
         return id
     }
 
-    fun activeFacts(): List<Row> = query("SELECT * FROM facts WHERE superseded_by IS NULL ORDER BY category, key")
+    /** Current memory. With [now], expired temporary memories are excluded. */
+    fun activeFacts(now: Instant? = null): List<Row> = if (now == null)
+        query("SELECT * FROM facts WHERE superseded_by IS NULL ORDER BY category, key")
+    else query("SELECT * FROM facts WHERE superseded_by IS NULL AND (valid_until IS NULL OR valid_until > ?) ORDER BY category, key", TimeUtil.iso(now))
 
     // ----------------------------------------------------------------- food
     fun addFood(now: Instant, occurred: Instant, values: Map<String, Any?>): Long =
@@ -346,10 +359,32 @@ class Store(val db: SQLiteDatabase, val tz: ZoneId) {
 
     fun lastProactiveSentAt(): String? = one("SELECT MAX(sent_at) AS t FROM interventions WHERE kind != 'contextual'")?.str("t")
 
-    fun markOpenAnswered(now: Instant) = exec(
-        "UPDATE interventions SET status = 'answered', responded_at = ? WHERE status = 'sent' AND kind NOT IN ('contextual') " +
-            "AND (commitment_id IS NULL OR kind = 'proactive')", TimeUtil.iso(now),
-    )
+    /** Any user message answers every open proactive message; records how long the user took. */
+    fun markOpenAnswered(now: Instant) {
+        query("SELECT id, sent_at FROM interventions WHERE status = 'sent' AND kind != 'contextual'").forEach { r ->
+            val minutes = java.time.Duration.between(TimeUtil.parse(r.str("sent_at")!!), now).toMinutes().toDouble()
+            exec("UPDATE interventions SET status = 'answered', responded_at = ?, response_minutes = ?, outcome = COALESCE(outcome, 'answered') WHERE id = ?",
+                TimeUtil.iso(now), minutes, r.long("id"))
+        }
+    }
+
+    fun setInterventionOutcome(now: Instant, id: Long, outcome: String) =
+        exec("UPDATE interventions SET outcome = ?, evaluated_at = ? WHERE id = ?", outcome, TimeUtil.iso(now), id)
+
+    // ------------------------------------------------------------ agent state
+    fun kv(key: String): String? = one("SELECT value FROM kv WHERE key = ?", key)?.str("value")
+    fun setKv(now: Instant, key: String, value: String?) {
+        if (value == null) exec("DELETE FROM kv WHERE key = ?", key)
+        else exec("INSERT INTO kv(key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+            key, value, TimeUtil.iso(now))
+    }
+
+    /** Things the agent should notice (arrivals, payments, sessions, sync results, taps...). */
+    fun addObservation(at: Instant, kind: String, summary: String, significant: Boolean = true): Long =
+        insert("observations", mapOf("observed_at" to TimeUtil.iso(at), "kind" to kind, "summary" to summary.take(300), "significant" to significant))
+    fun observationsAfter(id: Long, limit: Int = 30): List<Row> =
+        query("SELECT * FROM observations WHERE id > ? ORDER BY id LIMIT ?", id, limit)
+    fun recentObservations(limit: Int = 30): List<Row> = query("SELECT * FROM observations ORDER BY id DESC LIMIT ?", limit)
 
     fun lastButtonAt(): String? {
         val a = one("SELECT MAX(responded_at) AS t FROM interventions WHERE status IN ('acted','smaller','skipped','snoozed')")?.str("t")
@@ -488,6 +523,6 @@ class Store(val db: SQLiteDatabase, val tz: ZoneId) {
             .put("quiet_start", "22:30").put("quiet_end", "07:30").put("paused_until", JSONObject.NULL)
             .put("height_cm", JSONObject.NULL).put("goal_weight_kg", JSONObject.NULL).put("kcal_target", JSONObject.NULL)
             .put("protein_target_g", JSONObject.NULL).put("never_do", JSONArray()).put("goal_text", JSONObject.NULL)
-            .put("recap_time", "21:00").put("usual_meals", JSONObject())
+            .put("usual_meals", JSONObject())
     }
 }

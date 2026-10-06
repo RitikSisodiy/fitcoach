@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.0.0 — 2026-10-07 (autonomous agent)
+
+### Added
+- **Agent loop** (`Agent.kt`): the LLM decides whether to act, the message, quick replies, channel and its own next check time, from one SITUATION built from the database.
+  - It wakes on significant observations, on its own schedule, or after 4 h without evaluating.
+- **Outcome evaluation:** answered (with minutes), ignored, achieved or not_achieved. A daily LLM reflection turns these into coach insights that later decisions and replies use.
+- **Memory tiers:** long-term and temporary memory (with expiry) captured from natural chat, grounded in the user's words, and retrieved in every reply and decision.
+- **Telegram:** the phone long-polls the user's bot, so app chat and Telegram are one conversation with one memory. Pairing uses a code. Quick replies appear as inline buttons, and voice and photos work.
+- **Dashboard:**
+  - today, weight chart with trend, steps and food charts
+  - commitments with 14-day dots
+  - memory and coach insights
+  - interventions and their outcomes
+  - observations and agent decisions
+- `LiveAgentTest` (real Gemini, 3 simulated days) and live Telegram send tests.
+
+### Removed
+- Fixed-window candidates (the 21:00 recap, morning plan, and others), template fallbacks, scripted button replies, the escalation ladder, and weekly-review and snooze schedules. See `AUDIT.md`.
+- Python engine moved to `legacy/python/`. Prompts now live in `assets/prompts/`.
+
 ## 1.0.0 — 2026-10-06 (Android app, no server)
 
 ### Added

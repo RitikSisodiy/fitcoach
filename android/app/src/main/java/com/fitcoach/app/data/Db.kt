@@ -18,14 +18,34 @@ class Db(context: Context?, name: String? = "coach.db") :
 
     override fun onCreate(db: SQLiteDatabase) {
         SCHEMA.forEach { db.execSQL(it) }
+        MIGRATIONS.forEach { m -> m.forEach { db.execSQL(it) } }
     }
 
+    /** MIGRATIONS[i] upgrades version i+1 to i+2. */
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // Future migrations go here, one block per version.
+        for (v in oldVersion until newVersion) MIGRATIONS[v - 1].forEach { db.execSQL(it) }
     }
 
     companion object {
-        const val SCHEMA_VERSION = 1
+        const val SCHEMA_VERSION = 2
+
+        val MIGRATIONS = listOf(
+            // v2: agent loop, channels, memory tiers, intervention outcomes.
+            listOf(
+                "ALTER TABLE messages ADD COLUMN channel TEXT NOT NULL DEFAULT 'app'",
+                "ALTER TABLE messages ADD COLUMN intervention_id INTEGER",
+                "ALTER TABLE facts ADD COLUMN valid_until TEXT",
+                "ALTER TABLE interventions ADD COLUMN channel TEXT",
+                "ALTER TABLE interventions ADD COLUMN quick_replies_json TEXT",
+                "ALTER TABLE interventions ADD COLUMN expected_outcome TEXT",
+                "ALTER TABLE interventions ADD COLUMN outcome TEXT",
+                "ALTER TABLE interventions ADD COLUMN response_minutes REAL",
+                "ALTER TABLE interventions ADD COLUMN evaluated_at TEXT",
+                "CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL)",
+                """CREATE TABLE observations (id INTEGER PRIMARY KEY, observed_at TEXT NOT NULL, kind TEXT NOT NULL,
+                    summary TEXT NOT NULL, significant INTEGER NOT NULL DEFAULT 1)""",
+            ),
+        )
 
         val SCHEMA = listOf(
             "CREATE TABLE profile (key TEXT PRIMARY KEY, value_json TEXT NOT NULL, updated_at TEXT NOT NULL)",

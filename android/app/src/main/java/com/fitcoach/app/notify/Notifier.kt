@@ -13,6 +13,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.fitcoach.app.FitCoachApp
 import com.fitcoach.app.R
+import com.fitcoach.app.engine.Inbound
 import com.fitcoach.app.engine.Outbound
 import com.fitcoach.app.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
@@ -53,13 +54,14 @@ object Notifier {
             .setContentIntent(open)
             .setAutoCancel(true)
             .setPriority(if (quiet) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_HIGH)
-        msg.buttons.take(3).forEachIndexed { i, btn ->
+        // Quick replies written by the agent: tapping one sends it as the user's message, without opening the app.
+        msg.quickReplies.take(3).forEachIndexed { i, label ->
             val intent = Intent(ctx, ActionReceiver::class.java)
-                .setAction("com.fitcoach.app.ACTION.$i.${btn.data}")
-                .putExtra(ActionReceiver.EXTRA_DATA, btn.data)
-                .putExtra(ActionReceiver.EXTRA_MESSAGE_ID, msg.messageId ?: -1L)
-            val pi = PendingIntent.getBroadcast(ctx, btn.data.hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-            b.addAction(0, btn.label, pi)
+                .setAction("com.fitcoach.app.REPLY.${msg.messageId}.$i")
+                .putExtra(ActionReceiver.EXTRA_TEXT, label)
+                .putExtra(ActionReceiver.EXTRA_KEY, "nqr:${msg.messageId}:$i")
+            val pi = PendingIntent.getBroadcast(ctx, (msg.messageId ?: 0L).toInt() * 4 + i, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            b.addAction(0, label, pi)
         }
         try {
             NotificationManagerCompat.from(ctx).notify(id, b.build())
@@ -71,18 +73,18 @@ object Notifier {
     fun cancel(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(NOTIFICATION_ID)
 }
 
-/** Handles a notification action button without opening the app. */
+/** A tapped quick reply is the user's message: it goes through the same pipeline as anything typed. */
 class ActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val data = intent.getStringExtra(EXTRA_DATA) ?: return
-        val messageId = intent.getLongExtra(EXTRA_MESSAGE_ID, -1L).takeIf { it > 0 }
+        val text = intent.getStringExtra(EXTRA_TEXT) ?: return
+        val key = intent.getStringExtra(EXTRA_KEY)
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 val app = FitCoachApp.instance
-                val reply = app.service().handleButton(data, Instant.now(), messageId)
                 Notifier.cancel(context)
-                reply?.let { Notifier.show(context, it, quiet = it.buttons.isEmpty()) }
+                app.service().handleMessage(Inbound(text, Instant.now(), externalId = key, channel = "notification"))
+                    .forEach { Notifier.show(context, it, quiet = true) }
                 app.notifyDataChanged()
             } finally {
                 pending.finish()
@@ -91,7 +93,7 @@ class ActionReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        const val EXTRA_DATA = "data"
-        const val EXTRA_MESSAGE_ID = "message_id"
+        const val EXTRA_TEXT = "text"
+        const val EXTRA_KEY = "key"
     }
 }

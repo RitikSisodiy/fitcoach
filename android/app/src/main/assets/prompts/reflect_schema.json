@@ -1,0 +1,20 @@
+{
+ "type": "object",
+ "properties": {
+  "insights": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "key": {"type": "string", "description": "stable snake_case key, reuse the existing key when revising"},
+     "insight": {"type": "string"},
+     "evidence": {"type": "string"},
+     "confidence": {"type": "number"}
+    },
+    "required": ["key", "insight", "evidence", "confidence"]
+   }
+  },
+  "summary": {"type": "string", "description": "one sentence on how coaching is going"}
+ },
+ "required": ["insights", "summary"]
+}

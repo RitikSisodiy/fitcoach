@@ -21,13 +21,14 @@ Update it when you learn something reusable (add it under "Lessons"). Keep it sh
 - Never hardcode or print secrets. Keys live in `.env` on the laptop or in app-private preferences on the phone.
 
 ## Project conventions
-- **Deterministic code decides; the LLM only extracts and writes words.**
-  - Gates, budgets, numbers and safety checks are code.
-  - The LLM output is validated, and food, rules and settings must be grounded in the user's words.
-- **Python (`coach/`) is the reference engine and the source of the prompts.**
-  - To change a prompt or schema, edit the Python code, then run `python tools/export_prompts.py` to regenerate `android/app/src/main/assets/prompts.json`.
-- **Kotlin (`android/`) is the product.**
-  - Keep behaviour in parity with Python when porting.
+- **The LLM reasons and writes; code observes, stores, validates and limits.**
+  - The agent (`engine/Agent.kt`) decides whether, when, how and where to reach the user. See `docs/AGENT.md`.
+  - Code does only safety, grounding, data integrity, rate limits, quota and statistics.
+  - Never add a fixed clock window, a message template, a scripted reply or a per-intent button flow. Give the agent the fact instead.
+- **Kotlin (`android/`) is the only implementation.**
+  - Prompts and schemas live in `android/app/src/main/assets/prompts/`.
+  - `legacy/python/` is archived; don't edit it or copy from it.
+- **One backend for every channel.** App chat, notifications and Telegram all call `CoachService.handleMessage`, and proactive messages go out through `Delivery`.
   - New phone signals reuse the existing tables: places become `context_events`, sessions become `exercise` health records, payments become `inferred_events`.
 - **Every outgoing coach text goes through `Safety`.** Every LLM failure path has a template fallback.
 - **Respect the Gemini free tier.** Lite models are for text and Flash for media. Add no new LLM calls on hot paths without counting the quota cost.
@@ -36,7 +37,7 @@ Update it when you learn something reusable (add it under "Lessons"). Keep it sh
 - Run the tests that cover the change. Add a regression test for every bug fixed.
   - Python: `python -m pytest -q`
   - Android, on the laptop: `~/projects/fitcoach-build.sh assembleDebug testDebugUnitTest`
-- LLM-facing change: run the live test (`LiveGeminiTest` with `GEMINI_API_KEY` exported, or `tools/live_check.py`) and read the transcript, not just the pass/fail.
+- LLM-facing change: run `~/projects/fitcoach-live-tests.sh`. It runs `LiveAgentTest` (real Gemini, 3 days) and `TelegramTest.liveTelegramSend`. Then read `app/build/live-agent-transcript.txt`, not just the pass/fail.
 - UI or Android-runtime change: install on the emulator (`fitcoach-smoke.sh` or `fitcoach-release-check.sh`), check the screenshots, and check that `logcat -b crash` is empty.
 - Release APK: R8 is on, so smoke-test the release build itself, not just debug.
 
@@ -55,7 +56,9 @@ Update it when you learn something reusable (add it under "Lessons"). Keep it sh
 ## Lessons (keep adding)
 - Android `org.json`: `optString` on a JSON null returns `"null"`. Use `strOrNull()` from `core/Json.kt`.
 - Robolectric tests must not boot `FitCoachApp` (WorkManager). `src/test/resources/robolectric.properties` sets `application=android.app.Application`.
-- Unit tests prove the code paths; only real-Gemini runs prove extraction quality. Every live run so far has found bugs that mocks missed.
+- Unit tests prove the code paths; only real-Gemini runs prove extraction quality and agent judgement. Every live run so far has found bugs that mocks missed.
+- Tests that call `tick()` must pin a daytime instant. Quiet hours make `tick()` a no-op at night (`Instant.now()` broke a test at 00:07).
+- In JUnit 4, `runBlocking<Unit> { }` is needed when the last expression isn't Unit, otherwise "method should be void".
 - Python prompt strings are f-strings, so double the `{}` in JSON examples.
 - Pick tokenizers and regexes for Hinglish ("sabzi.", "roti,"). Test with real user-style messages.
 - Build environment:

@@ -13,6 +13,7 @@ import com.fitcoach.app.llm.LlmProvider
 import com.fitcoach.app.llm.LlmRequest
 import com.fitcoach.app.llm.LlmResponse
 import com.fitcoach.app.notify.Notifier
+import com.fitcoach.app.telegram.Telegram
 import com.fitcoach.app.work.Scheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,9 +42,10 @@ class FitCoachApp : Application() {
         instance = this
         store = Store(Db(this).writableDatabase, ZoneId.systemDefault())
         foods = assets.open("foods_seed.csv").use(FoodTable::load)
-        prompts = assets.open("prompts.json").use(Prompts::load)
+        prompts = Prompts.fromAssets(assets)
         Notifier.createChannels(this)
         Scheduler.ensureScheduled(this)
+        Telegram.ensureRunning(this)
     }
 
     fun notifyDataChanged() { _version.value = _version.value + 1 }
@@ -60,7 +62,10 @@ class FitCoachApp : Application() {
         val key = apiKey
         cachedService?.let { if (key == cachedKey) return it }
         val llm: LlmProvider = if (key == null) NoKeyProvider else GeminiProvider(key, usageFile = File(filesDir, "gemini_usage.json"))
-        return CoachService(store, llm, foods, prompts).also { cachedService = it; cachedKey = key }
+        return CoachService(store, llm, foods, prompts).also {
+            it.telegramLinked = { Telegram.isLinked(this) }
+            cachedService = it; cachedKey = key
+        }
     }
 
     private object NoKeyProvider : LlmProvider {

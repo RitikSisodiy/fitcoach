@@ -220,3 +220,52 @@ Message types with 0 responses in their last 6 sends are retired for 7 days. Re-
   - It notifies once per new version and shows an Update banner.
   - It downloads the APK and installs it through `PackageInstaller`. The user confirms the system dialog and allows "Install unknown apps" once.
 **Consequences.** Docs-only pushes don't create releases. Installs signed with the old debug key (1.0.0) must be uninstalled once before the first CI release.
+
+### D-032 — The LLM decides when and what; code only limits (v2 agent loop)
+**Context.** The v1.1 audit (`docs/AUDIT.md`) found rules plus LLM wording:
+- fixed clock windows (a 21:00 recap, a 08:30 morning plan, others);
+- template fallbacks sent as coaching;
+- about 20 scripted button replies;
+- a deterministic escalation ladder.
+**Decision.** On each wake-up, the agent (`engine/Agent.kt`) gets one SITUATION built from the database and returns:
+- whether to act;
+- the message and up to 3 quick replies;
+- the channel;
+- the expected outcome;
+- its **own next check time and reason**.
+
+The agent is woken by significant observations, by its own check time, or by a 4-hour safety net. Code enforces only pause, quiet hours, the daily cap (coaching mode × engagement), the minimum gap, safety and the evaluation quota.
+
+Brain candidates, templates, the ladder, the weekly-review slot and snooze follow-ups are all deleted. When the AI is down the agent stays silent. Replies to the user show a labelled status line.
+**Consequences.** Behaviour depends on prompt quality, so it is verified with `LiveAgentTest` (real Gemini, 3 simulated days) and by reading its transcript. The cost is ~10–25 decision calls per day on Flash-Lite.
+
+### D-033 — Telegram on the phone (long polling), one backend
+**Decision.**
+- **Polling:** a foreground service (`specialUse`) long-polls the user's own bot. Messages, voice notes, photos and quick-reply callbacks go into the same `CoachService.handleMessage` as the app chat.
+- **Pairing:** a one-time code the user sends with `/start`.
+- **Proactive messages:** go to Telegram when the agent picks that channel.
+
+The retired Python bot is not used.
+**Consequences.** Only one device may poll a bot at a time. The polling service needs the battery-optimisation exemption on ColorOS (already part of Setup).
+
+### D-034 — Prompts live in Android assets; Python archived
+**Decision.** Prompts and schemas are files in `android/app/src/main/assets/prompts/`. The Python engine moved to `legacy/python/`, unmaintained, because it duplicated all logic and still contained the removed scripted flows.
+
+### D-035 — Memory tiers
+**Decision.**
+- **Events** stay in their tables.
+- **Memory** lives in `facts`:
+  - long-term: `valid_until` is null;
+  - temporary: `valid_until` is set; the LLM gives `valid_days` and expired rows drop out of retrieval;
+  - coach insights: category `coach_insight`, written only by the daily reflection.
+
+Memory items must be grounded in the user's words, like food items. Every reply and decision gets all three tiers. History beyond 7 days is fetched on demand through `data_needed`.
+
+### D-036 — Quick replies instead of buttons
+**Decision.** Tappable options are written by the LLM per message. A tap is handled exactly like a typed message, in app chat, notification actions and Telegram inline keyboards. Extraction sees the open message and its options (`OPEN_NUDGES`). No outcome is hard-wired to a button.
+
+### D-037 — Learning from outcomes
+**Decision.**
+- **Outcome tracking:** each proactive message gets an outcome: answered (with minutes to reply), ignored (no reply within 3 h), achieved or not_achieved (for commitment messages, from the day's commitment log).
+- **Statistics:** code computes response rates by 3-hour block and by channel, plus slot-learner estimates for commitments.
+- **Reflection:** a daily LLM step rewrites up to 8 coach insights with evidence. Decisions and replies are told to follow them.

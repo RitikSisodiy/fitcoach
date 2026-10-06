@@ -4,6 +4,8 @@ Priority: P0 (blocks real use) · P1 (high value) · P2 (later). Status: TODO ·
 
 ## DONE
 
+- [x] v2 autonomous agent: audit, agent loop, memory tiers, outcome learning, Telegram, dashboard (D-032…D-037)
+
 - [x] v1.0 Android app (D-027…D-030): engine port, on-device sensors, in-app chat, notifications with buttons, Setup checklist for ColorOS
 - [x] Android tests: 11 engine + 9 service (scripted LLM) + 1 live Gemini day, all green on 2026-10-06
 
@@ -43,6 +45,10 @@ Priority: P0 (blocks real use) · P1 (high value) · P2 (later). Status: TODO ·
 - Release build with R8 (3.4 MB APK): done 2026-10-06.
 
 ## TODO
+
+- [ ] **P0** The user runs v2 for a real week (app + Telegram). Review the dashboard decision log and the coach insights. Tune `agent_system.txt` from real misses.
+- [x] Quiet hours setting (Setup → Coaching style).
+- [ ] P1: Agent repeats near-identical messages on consecutive days. Watch it and, if needed, add "never repeat" evidence to the SITUATION.
 
 - [ ] **P0** The user installs the APK and runs a real week. Watch for ColorOS killing the worker, notification-parser misses on the user's bank SMS format, and geofence reliability.
 - [x] Git repo, CI release on push to master, versioning, in-app updates (D-031).
