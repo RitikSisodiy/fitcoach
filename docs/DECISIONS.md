@@ -216,7 +216,7 @@ Message types with 0 responses in their last 6 sends are retired for 7 days. Re-
   - Local builds are `x.y.0`.
 - **Signing:** CI signs with a fixed release key held in repository secrets. The backup is on the laptop at `~/.fitcoach-signing/`. Losing the key means users must reinstall.
 - **In-app update:**
-  - `update/Updater.kt` checks `releases/latest` at most every 6 h from the tick worker, and again on every app open.
+  - `update/Updater.kt` checks `releases/latest` every 3 h from the tick worker, and on app open (throttled to 10 minutes).
   - It notifies once per new version and shows an Update banner.
   - It downloads the APK and installs it through `PackageInstaller`. The user confirms the system dialog and allows "Install unknown apps" once.
 **Consequences.** Docs-only pushes don't create releases. Installs signed with the old debug key (1.0.0) must be uninstalled once before the first CI release.

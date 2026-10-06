@@ -24,7 +24,8 @@ import java.net.URL
 object Updater {
     private const val REPO = "RitikSisodiy/fitcoach"
     private const val LATEST_URL = "https://api.github.com/repos/$REPO/releases/latest"
-    private const val CHECK_EVERY_MS = 6 * 60 * 60 * 1000L
+    const val BACKGROUND_INTERVAL_MS = 3 * 60 * 60 * 1000L
+    const val APP_OPEN_INTERVAL_MS = 10 * 60 * 1000L
     private const val NOTIFICATION_ID = 2001
 
     data class Release(val version: String, val apkUrl: String, val notes: String)
@@ -59,11 +60,11 @@ object Updater {
         return Release(v, p.getString("url", "")!!, p.getString("notes", "")!!)
     }
 
-    /** Checks GitHub (at most every 6 h unless [force]) and notifies once per new version. Never throws. */
-    suspend fun check(ctx: Context, force: Boolean = false): Release? = withContext(Dispatchers.IO) {
+    /** Checks GitHub if the last check is older than [minIntervalMs]; notifies once per new version. Never throws. */
+    suspend fun check(ctx: Context, minIntervalMs: Long = BACKGROUND_INTERVAL_MS): Release? = withContext(Dispatchers.IO) {
         val p = prefs(ctx)
         val now = System.currentTimeMillis()
-        if (!force && now - p.getLong("checked_at", 0L) < CHECK_EVERY_MS) return@withContext available(ctx)
+        if (now - p.getLong("checked_at", 0L) < minIntervalMs) return@withContext available(ctx)
         try {
             val conn = URL(LATEST_URL).openConnection() as HttpURLConnection
             conn.setRequestProperty("Accept", "application/vnd.github+json")

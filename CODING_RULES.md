@@ -65,5 +65,6 @@ Update it when you learn something reusable (add it under "Lessons"). Keep it sh
   - Compose 1.12+ needs `compileSdk 37`.
   - Files sent to the chat are capped at 30 MB. Ship the R8 release APK (~3.4 MB), not debug (~39 MB).
 - Anchor `.gitignore` paths to the root (`/data/`, not `data/`). The unanchored `data/` silently excluded `android/.../data/` and broke the first CI build. Check `git status` for missing source files before pushing.
+- Throttles must not block the user-facing path. The updater shared one 6-hour throttle with app open and missed a release it had just published. Test update flows with two real releases.
 - Release signing must never change, or in-place updates fail. Keep the keystore backup (`~/.fitcoach-signing/` on the laptop) safe.
 - After editing the same file in both places (cloud copy and laptop copy), compare checksums (`md5sum`) so the two never drift.

@@ -96,7 +96,8 @@ private fun UpdateBanner() {
     val scope = rememberCoroutineScope()
     var release by remember { mutableStateOf(Updater.available(ctx)) }
     var status by remember { mutableStateOf("") }
-    LaunchedEffect(Unit) { release = Updater.check(ctx) }
+    // Opening the app checks almost every time; the background worker checks every few hours.
+    LaunchedEffect(Unit) { release = Updater.check(ctx, Updater.APP_OPEN_INTERVAL_MS) }
     val rel = release ?: return
     Card(Modifier.fillMaxWidth().padding(8.dp)) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
