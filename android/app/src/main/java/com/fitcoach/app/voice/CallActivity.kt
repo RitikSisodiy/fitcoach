@@ -6,7 +6,6 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -49,8 +48,13 @@ class CallActivity : ComponentActivity() {
     private var purpose by mutableStateOf<String?>(null)
     private var ringing by mutableStateOf(false)
 
-    private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) connect() else CallManager.state.value = CallUi(callId = callId, phase = "failed", note = "Microphone permission is needed for calls")
+    // Plain permission request: registerForActivityResult trips lint (an old transitive Fragment) in release builds.
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != MIC_REQUEST) return
+        if (CallManager.hasMic(this)) connect()
+        else CallManager.state.value = CallUi(callId = callId, phase = "failed", note = "Microphone permission is needed for calls")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,7 +93,7 @@ class CallActivity : ComponentActivity() {
         ringing = false
         CallManager.stopRinging(this)
         FitCoachApp.instance.service().setCallStatus(Instant.now(), callId, "answered")
-        if (CallManager.hasMic(this)) connect() else micPermission.launch(Manifest.permission.RECORD_AUDIO)
+        if (CallManager.hasMic(this)) connect() else requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), MIC_REQUEST)
     }
 
     private fun connect() {
@@ -162,6 +166,7 @@ class CallActivity : ComponentActivity() {
         const val EXTRA_CALL = "call_id"
         const val EXTRA_ANSWER = "answer"
         const val EXTRA_USER_STARTED = "user_started"
+        private const val MIC_REQUEST = 7
 
         fun intent(ctx: Context, callId: Long, answer: Boolean): Intent = Intent(ctx, CallActivity::class.java)
             .putExtra(EXTRA_CALL, callId).putExtra(EXTRA_ANSWER, answer)

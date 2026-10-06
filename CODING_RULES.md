@@ -76,3 +76,4 @@ Update it when you learn something reusable (add it under "Lessons"). Keep it sh
 - Real-time voice can be tested without a human: two Gemini Live sessions, one role-playing the user, piping audio to each other (24 kHz out, resampled to 16 kHz in, streamed in real time with silence between turns).
 - Live tests that call `tick()` run at any hour. Move quiet hours away from now inside the test, or the agent never runs.
 - OkHttp 4 from Kotlin: use the extension APIs (`toMediaType()`, `asRequestBody()`, `response.body`). The Java-style statics are errors.
+- Run `lintVitalRelease assembleRelease` locally before pushing new Activities or dependencies. CI's release lint rejected `registerForActivityResult` in a plain `ComponentActivity`, because an old Fragment comes in transitively. Debug builds don't run that check.
