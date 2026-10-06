@@ -1,0 +1,185 @@
+{
+  "mode": "live",
+  "days": 7,
+  "tracking": {
+    "main_meals_truth": 21,
+    "main_meals_captured_by_source": {
+      "missing": 14,
+      "inferred_unconfirmed": 2,
+      "user_entered": 5
+    },
+    "main_meal_capture_pct": 33,
+    "street_food_events_truth": 2,
+    "street_food_days_captured": 2,
+    "food_orders_truth": 3,
+    "inferred_events": [
+      {
+        "kind": "food_order",
+        "status": "auto_logged",
+        "n": 2
+      },
+      {
+        "kind": "food_order",
+        "status": "pending",
+        "n": 1
+      },
+      {
+        "kind": "small_payment",
+        "status": "auto_confirmed",
+        "n": 1
+      },
+      {
+        "kind": "small_payment",
+        "status": "confirmed",
+        "n": 1
+      }
+    ],
+    "kcal_mape_on_fully_covered_days": null,
+    "fully_covered_days": 0,
+    "days_with_intake_estimate_incl_assumed": 0,
+    "intake_estimate_mape_pct": null,
+    "intake_estimate_bias_pct": null,
+    "steps_days_with_data": 7,
+    "walk_days_truth": 2,
+    "walk_days_recorded": 0
+  },
+  "understanding": {
+    "patterns": [
+      {
+        "claim": "lunch is rarely logged (0 of 6 active days)",
+        "status": "active",
+        "first_seen": "2026-09-12"
+      },
+      {
+        "claim": "'busy_at_work' usually happens on wed around 17:10 (1 of 1 weds)",
+        "status": "candidate",
+        "first_seen": "2026-09-10"
+      },
+      {
+        "claim": "'chess_club' usually happens on sat around 18:00 (1 of 1 sats)",
+        "status": "candidate",
+        "first_seen": "2026-09-13"
+      }
+    ],
+    "chess_days": 2
+  },
+  "coaching": {
+    "proactive_by_intent": {
+      "morning_plan": 5,
+      "onboarding": 7,
+      "recap": 5,
+      "weekly_review": 1
+    },
+    "pre_emptive_chess_messages": 0,
+    "proactive_per_day_by_week": {
+      "1": 2.57
+    },
+    "response_rate_by_week": {
+      "1": "11/18"
+    },
+    "engagement_states": {
+      "engaged": 7
+    },
+    "engagement_timeline": [
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E"
+    ],
+    "retired_types_seen": [],
+    "commitments": []
+  },
+  "safety": {
+    "tone_or_safety_violations": 0,
+    "messages_in_quiet_hours": 0
+  },
+  "llm_calls": 0,
+  "sample_messages": [
+    {
+      "at": "2026-09-07T08:30:00+05:30",
+      "text": "Bhai, 9.8 hours ki meetings hain aaj. 13:00 to 13:45 wale free slot mein lunch fix kar lein?",
+      "intent": "morning_plan",
+      "buttons": []
+    },
+    {
+      "at": "2026-09-07T10:00:00+05:30",
+      "text": "Breakfast mein kya khate ho usually?",
+      "intent": "onboarding",
+      "buttons": []
+    },
+    {
+      "at": "2026-09-07T21:00:00+05:30",
+      "text": "Breakfast, lunch, dinner sab missing hain aaj. Want to log anything quickly?",
+      "intent": "recap",
+      "buttons": [
+        "Off-plan day",
+        "Skip today"
+      ]
+    },
+    {
+      "at": "2026-09-08T08:30:00+05:30",
+      "text": "Morning! Subah ka plan kya hai breakfast ke liye?",
+      "intent": "morning_plan",
+      "buttons": []
+    },
+    {
+      "at": "2026-09-08T10:00:00+05:30",
+      "text": "Breakfast mein usually kya khate ho?",
+      "intent": "onboarding",
+      "buttons": []
+    },
+    {
+      "at": "2026-09-08T21:00:00+05:30",
+      "text": "Lunch, dinner, aur 18:40 pe ₹50 waala chaat log karna hai kya?",
+      "intent": "recap",
+      "buttons": [
+        "Off-plan day",
+        "Skip today",
+        "Food: ₹50 payment (SHARMA CH",
+        "Not food"
+      ]
+    },
+    {
+      "at": "2026-09-11T08:30:00+05:30",
+      "text": "Looks like a packed day with 9.8 hours of meetings. Before 9 AM starts, what's the plan for lunch today?",
+      "intent": "morning_plan",
+      "buttons": []
+    },
+    {
+      "at": "2026-09-11T10:00:00+05:30",
+      "text": "Breakfast mein usually kya hota hai?",
+      "intent": "onboarding",
+      "buttons": []
+    },
+    {
+      "at": "2026-09-12T10:00:00+05:30",
+      "text": "Hey! To make logging easier for you, what do you usually have for breakfast or lunch? Knowing your go-to meals helps us set up quick one-tap tracking.",
+      "intent": "onboarding",
+      "buttons": []
+    },
+    {
+      "at": "2026-09-13T10:00:00+05:30",
+      "text": "Breakfast mein usually kya khate ho?",
+      "intent": "onboarding",
+      "buttons": []
+    },
+    {
+      "at": "2026-09-13T19:00:00+05:30",
+      "text": "Logged 6 out of 7 days and kept weight moving at 83.67 kg trend. Work busyness got in the way of steps, averaging 4,876. \n\nExperiment for next week: If work gets hectic, do a 10-minute walk right after lunch to hit 6k steps daily, measured by your daily step log. \n\nDo you agree?",
+      "intent": "weekly_review",
+      "buttons": []
+    },
+    {
+      "at": "2026-09-13T21:00:00+05:30",
+      "text": "Dinner ya breakfast ka kuch log karna hai kya?",
+      "intent": "recap",
+      "buttons": [
+        "Off-plan day",
+        "Skip today"
+      ]
+    }
+  ]
+}

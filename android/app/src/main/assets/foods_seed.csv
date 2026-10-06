@@ -1,0 +1,69 @@
+key,aliases,default_unit,grams_per_unit,kcal_low,kcal_high,protein_low,protein_high,category
+roti,roti|chapati|chapatti|phulka|fulka|rotli|wheat roti,piece,40,90,120,2.5,3.5,staple
+paratha,paratha|plain paratha|parantha,piece,80,200,280,4,5.5,staple
+aloo_paratha,aloo paratha|aloo parantha,piece,130,250,360,5,7,staple
+rice,rice|chawal|steamed rice|plain rice|white rice,katori,150,170,210,3,4,staple
+jeera_rice,jeera rice,katori,150,200,260,3,4,staple
+dal,dal|daal|dal tadka|toor dal|arhar dal|moong dal|masoor dal|dal fry,katori,150,120,200,6,9,legume
+rajma,rajma|rajma masala|kidney beans,katori,150,160,240,7,10,legume
+chole,chole|chana masala|chhole|chickpea curry,katori,150,180,280,7,10,legume
+sabzi,sabzi|sabji|mixed veg|dry sabzi|bhindi|aloo gobi|lauki|tori|beans sabzi|cabbage sabzi,katori,150,90,180,2,4,vegetable
+aloo_sabzi,aloo sabzi|aloo ki sabzi|potato sabzi|aloo matar|dum aloo,katori,150,150,250,2,3.5,vegetable
+paneer_sabzi,paneer sabzi|paneer butter masala|palak paneer|matar paneer|shahi paneer|kadai paneer|paneer curry,katori,150,250,400,10,15,dairy
+paneer,paneer|raw paneer|cottage cheese,serving,100,260,300,18,20,dairy
+chicken_curry,chicken curry|chicken|chicken gravy|chicken masala|desi chicken,katori,150,200,320,18,26,meat
+butter_chicken,butter chicken|murgh makhani|chicken tikka masala,katori,150,300,450,18,24,meat
+grilled_chicken,grilled chicken|chicken breast|boiled chicken,serving,100,150,190,28,32,meat
+tandoori_chicken,tandoori chicken|chicken tikka,piece,120,180,260,20,27,meat
+egg_boiled,egg|eggs|anda|boiled egg|ande,piece,50,70,80,6,6.5,egg
+omelette,omelette|omelet|anda omelette,piece,110,180,250,12,13,egg
+egg_bhurji,egg bhurji|anda bhurji|scrambled eggs,serving,120,200,280,12,13,egg
+curd,curd|dahi|yogurt|yoghurt,katori,150,90,110,5,7,dairy
+raita,raita|boondi raita,katori,150,80,130,4,5,dairy
+milk,milk|doodh,glass,250,120,170,8,8.5,dairy
+chai,chai|tea|masala chai|milk tea,cup,120,70,120,2,3,beverage
+coffee,coffee|milk coffee|filter coffee|cappuccino|latte,cup,150,80,140,3,4,beverage
+black_coffee,black coffee|americano|espresso,cup,150,2,5,0,0.3,beverage
+cold_coffee,cold coffee,glass,250,180,300,6,8,beverage
+sev,sev|bhujia sev,handful,30,160,170,3,4.5,snack
+namkeen,namkeen|bhujia|mixture|chivda|aloo bhujia,handful,30,150,170,3,5,snack
+samosa,samosa,piece,100,230,320,4,6,snack
+kachori,kachori|kachauri,piece,70,200,300,4,6,snack
+pakora,pakora|pakoda|bhajiya|bhajji,piece,25,60,90,1,2,snack
+vada_pav,vada pav|wada pav,piece,150,280,350,6,8,snack
+pav_bhaji,pav bhaji,plate,350,450,650,10,14,snack
+poha,poha|kanda poha,katori,150,180,280,3,5,breakfast
+upma,upma,katori,150,180,260,4,6,breakfast
+idli,idli|idly,piece,40,35,60,1.5,2.2,breakfast
+dosa,dosa|plain dosa|sada dosa,piece,90,120,180,3,4,breakfast
+masala_dosa,masala dosa,piece,180,300,420,6,8,breakfast
+sambar,sambar|sambhar,katori,150,80,130,3,5,legume
+biryani,biryani|chicken biryani|mutton biryani,plate,300,450,700,18,28,mixed
+veg_biryani,veg biryani|pulao|veg pulao,plate,250,350,500,6,10,mixed
+khichdi,khichdi|khichri,katori,150,150,230,5,8,mixed
+instant_noodles,maggi|instant noodles|noodles packet,packet,70,300,400,7,9,snack
+chowmein,chowmein|hakka noodles|chow mein,plate,250,350,550,8,12,mixed
+momos,momos|momo|steamed momos,piece,30,35,60,1.5,2.5,snack
+bread,bread|bread slice|brown bread,slice,30,70,85,2.5,3,staple
+banana,banana|kela,piece,120,90,120,1,1.4,fruit
+apple,apple|seb,piece,180,85,105,0.4,0.6,fruit
+fruit_chaat,fruit chaat|fruit bowl|fruits,katori,150,80,140,1,2,fruit
+salad,salad|green salad|cucumber|kheera,katori,100,20,50,1,2,vegetable
+peanuts,peanuts|moongfali|mungfali|groundnuts,handful,30,165,180,7,8,snack
+roasted_chana,roasted chana|bhuna chana|chana,handful,30,105,125,5.5,6.5,snack
+makhana,makhana|fox nuts|roasted makhana,handful,15,50,60,1.4,1.6,snack
+whey,whey|whey protein|protein shake|protein powder,scoop,30,110,130,22,25,supplement
+soya_chunks,soya chunks|soyabean chunks|nutrela,serving,50,170,180,25,27,legume
+gulab_jamun,gulab jamun,piece,50,140,180,1.5,2.5,sweet
+jalebi,jalebi,piece,30,100,150,0.5,1,sweet
+ladoo,ladoo|laddu|besan ladoo|motichoor ladoo,piece,40,170,220,2.5,4,sweet
+pizza,pizza|pizza slice,slice,100,250,320,10,13,fast_food
+burger,burger|veg burger|chicken burger,piece,180,300,550,12,25,fast_food
+french_fries,french fries|fries,serving,117,320,400,3.5,4.5,fast_food
+soft_drink,coke|cola|pepsi|soft drink|thums up|sprite|cold drink,can,330,135,150,0,0,beverage
+beer,beer,can,330,140,160,1,2,beverage
+ghee,ghee|desi ghee,tsp,5,43,46,0,0,fat
+oil,oil|cooking oil|refined oil|mustard oil,tbsp,15,120,125,0,0,fat
+sugar,sugar|cheeni,tsp,5,19,20,0,0,sweet
+street_snack,street snack|street food|chaat|snack from stall|nashta stall,piece,100,150,400,3,8,snack
+restaurant_meal,restaurant meal|ordered meal|swiggy order|zomato order|outside food,plate,400,600,1100,15,40,mixed

@@ -1,0 +1,208 @@
+{
+  "mode": "live",
+  "days": 7,
+  "tracking": {
+    "main_meals_truth": 21,
+    "main_meals_captured_by_source": {
+      "missing": 11,
+      "user_entered": 8,
+      "inferred_unconfirmed": 2
+    },
+    "main_meal_capture_pct": 48,
+    "street_food_events_truth": 3,
+    "street_food_days_captured": 2,
+    "food_orders_truth": 2,
+    "inferred_events": [
+      {
+        "kind": "food_order",
+        "status": "auto_logged",
+        "n": 2
+      },
+      {
+        "kind": "small_payment",
+        "status": "expired",
+        "n": 1
+      },
+      {
+        "kind": "small_payment",
+        "status": "pending",
+        "n": 2
+      }
+    ],
+    "kcal_mape_on_fully_covered_days": null,
+    "fully_covered_days": 0,
+    "days_with_intake_estimate_incl_assumed": 0,
+    "intake_estimate_mape_pct": null,
+    "intake_estimate_bias_pct": null,
+    "steps_days_with_data": 7,
+    "walk_days_truth": 2,
+    "walk_days_recorded": 0
+  },
+  "understanding": {
+    "patterns": [
+      {
+        "claim": "lunch is rarely logged (1 of 6 active days)",
+        "status": "active",
+        "first_seen": "2026-09-12"
+      },
+      {
+        "claim": "'busy_at_work' usually happens on wed around 17:10 (1 of 1 weds)",
+        "status": "candidate",
+        "first_seen": "2026-09-10"
+      },
+      {
+        "claim": "'busy_at_work' usually happens on fri around 17:10 (1 of 1 fris)",
+        "status": "candidate",
+        "first_seen": "2026-09-12"
+      },
+      {
+        "claim": "On 'busy_at_work' days, off-plan eating happened 0 of 2 times",
+        "status": "candidate",
+        "first_seen": "2026-09-12"
+      }
+    ],
+    "chess_days": 2
+  },
+  "coaching": {
+    "proactive_by_intent": {
+      "onboarding": 4,
+      "recap": 6,
+      "morning_plan": 2,
+      "commitment": 4,
+      "weekly_review": 1
+    },
+    "pre_emptive_chess_messages": 0,
+    "proactive_per_day_by_week": {
+      "1": 2.43
+    },
+    "response_rate_by_week": {
+      "1": "9/17"
+    },
+    "engagement_states": {
+      "engaged": 7
+    },
+    "engagement_timeline": [
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E",
+      "E"
+    ],
+    "retired_types_seen": [],
+    "commitments": [
+      {
+        "id": 1,
+        "title": "Evening walk",
+        "status": "active"
+      }
+    ]
+  },
+  "safety": {
+    "tone_or_safety_violations": 0,
+    "messages_in_quiet_hours": 0
+  },
+  "llm_calls": 0,
+  "sample_messages": [
+    {
+      "at": "2026-09-07T10:00:00+05:30",
+      "text": "Hey! Wahan se start karte hain: what is your main goal right now?",
+      "intent": "onboarding:goal",
+      "buttons": []
+    },
+    {
+      "at": "2026-09-07T11:30:00+05:30",
+      "text": "Apna current weight batao taaki target set karne mein easy ho.",
+      "intent": "onboarding:weight",
+      "buttons": []
+    },
+    {
+      "at": "2026-09-07T21:00:00+05:30",
+      "text": "Aaj ke meals log nahi hue hain, breakfast, lunch ya dinner me se kuch add karna hai kya?",
+      "intent": "recap",
+      "buttons": [
+        "Off-plan day",
+        "Skip today"
+      ]
+    },
+    {
+      "at": "2026-09-08T10:00:00+05:30",
+      "text": "Breakfast kya khaya aaj?",
+      "intent": "onboarding:usual_meals",
+      "buttons": []
+    },
+    {
+      "at": "2026-09-08T11:30:00+05:30",
+      "text": "Lunch time ho raha hai, koi chhota habit start karna hai? Jaise lunch ke baad 10 min walk ya bas ek glass paani?",
+      "intent": "onboarding:first_habit",
+      "buttons": []
+    },
+    {
+      "at": "2026-09-08T21:00:00+05:30",
+      "text": "Did you manage to have lunch today, or did it get missed in the rush?",
+      "intent": "recap",
+      "buttons": [
+        "Off-plan day",
+        "Skip today"
+      ]
+    },
+    {
+      "at": "2026-09-11T08:30:00+05:30",
+      "text": "Busy day ahead with 9.8 hours of meetings. Since you're WFH, can we lock in a 15-min lunch break and your evening walk now?",
+      "intent": "morning_plan",
+      "buttons": []
+    },
+    {
+      "at": "2026-09-11T19:00:00+05:30",
+      "text": "Busy day today. 10 minutes walk is enough to keep the streak alive. Can you do that now?",
+      "intent": "commitment:1",
+      "buttons": [
+        "Done",
+        "Smaller version",
+        "Later",
+        "Skip today"
+      ]
+    },
+    {
+      "at": "2026-09-11T22:00:00+05:30",
+      "text": "Breakfast aur lunch log nahi hue aaj, add karne hain ya breakfast ke liye 1 poha, 1 chai mark kar dein?",
+      "intent": "recap",
+      "buttons": [
+        "All usual",
+        "Usual + outside snack",
+        "Off-plan day",
+        "Skip today"
+      ]
+    },
+    {
+      "at": "2026-09-12T19:00:00+05:30",
+      "text": "Shaam ka walk miss ho raha hai, full 30 min nahi toh bas 10 min hi chal lo.",
+      "intent": "commitment:1",
+      "buttons": [
+        "Done",
+        "Smaller version",
+        "Later",
+        "Skip today"
+      ]
+    },
+    {
+      "at": "2026-09-12T21:00:00+05:30",
+      "text": "Din bhar ka khana log nahi kiya. Breakfast, lunch, dinner ke kya status hain?",
+      "intent": "recap",
+      "buttons": [
+        "All usual",
+        "Off-plan day",
+        "Skip today",
+        "Food: ₹30 payment (SHARMA CH",
+        "Not food"
+      ]
+    },
+    {
+      "at": "2026-09-13T19:00:00+05:30",
+      "text": "Logged food all 7 days and averaged 6,151 steps, solid consistency there. Evening walks dropped off completely because the 19:00 slot kept hitting work overruns. \n\nNext week's experiment: if work runs past 19:00, do a 10-minute indoor walk right after closing the laptop, measured by daily completion in the chat. \n\nSound good?",
+      "intent": "weekly_review",
+      "buttons": []
+    }
+  ]
+}
