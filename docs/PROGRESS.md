@@ -44,6 +44,8 @@ Newest first. One dated block per session: what changed, how it was verified, an
       4. Answer opened a live call on `gemini-3.8-live`, and the coach spoke first in Hinglish about the user's situation.
       5. End: the call was stored, and the agent re-evaluated ("follow up on the silent call").
     - **📞 user-started call:** also verified on the emulator.
+  - Release: CI published v2.1.8. Verified on the emulator: in-app update 2.0.6 -> 2.1.8 (DB migrated, Setup shows "You're up to date").
+  - CI's first run failed on release lint (activity-result API in `CallActivity`). Fixed; the lesson is in CODING_RULES.
   - Found and fixed during verification:
     - The reply prompt said the coach "can't call". It now knows calls exist.
     - Live tests at night hit quiet hours; they now move quiet hours away from now.
