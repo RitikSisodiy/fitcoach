@@ -31,7 +31,7 @@ A personal, proactive AI fitness coach for one lazy user (Hinglish, India).
 
 ## Environments
 - **Cloud workspace** (`/home/claude/fitness-coach`): edit code here. It has no access to Google Maven or Gemini.
-- **Laptop** (`~/projects/fitness-coach`, pop-os, user ritiksisodiya): build, test, emulator.
+- **Laptop** (`~/projects/fitness-coach`, pop-os, user ritiksisodiya): git working copy (push from here), build, test, emulator.
   - Toolchain: JDK 21 at `~/tools/jdk-21` and SDK at `~/Android/Sdk` (installed by `~/projects/android-toolchain-setup.sh`).
   - `.env` holds `GEMINI_API_KEY`. Never print it.
   - Scripts in `~/projects/`:
@@ -39,6 +39,8 @@ A personal, proactive AI fitness coach for one lazy user (Hinglish, India).
     - `fitcoach-smoke.sh` (emulator AVD `fitcoach_api35`)
     - `fitcoach-e2e.sh`
     - `fitcoach-release-check.sh`
+    - `fitcoach-update-check.sh install|update [fresh]` (in-app update test against real releases)
+    - `fitcoach-signing-setup.sh` (release key; secrets in GitHub; backup in `~/.fitcoach-signing/`)
   - Sync cloud → laptop: tar the changed files, deliver them with SendUserFile, then commit them to `~/projects/` and extract. For small edits, apply the same patch on both sides and compare `md5sum`.
 - **Phone:** OnePlus / Oppo / Realme / Vivo (ColorOS). Aggressive background killing is the main runtime risk.
 
