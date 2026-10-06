@@ -35,6 +35,7 @@ A personal, proactive AI fitness coach for one lazy user (Hinglish, India).
 - `docs/ANDROID.md`: app design and the first-run checklist.
 - `docs/AGENT.md`: the agent loop.
 - `docs/AUDIT.md`: what v1.1 got wrong.
+- `docs/voice/`: voice research, architecture, decisions (V-xxx) and the task plan (VT-xx).
 
 ## Environments
 - **Cloud workspace** (`/home/claude/fitness-coach`): edit code here. It has no access to Google Maven or Gemini.
