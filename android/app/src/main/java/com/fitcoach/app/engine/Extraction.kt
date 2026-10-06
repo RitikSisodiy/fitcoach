@@ -19,6 +19,7 @@ import kotlin.math.roundToInt
 data class ExtractedFood(
     val name: String, val quantity: Double?, val unit: String?, val mealSlot: String, val eaten: Boolean,
     val estKcal: Pair<Double?, Double?>, val estProtein: Pair<Double?, Double?>, val confidence: Double,
+    val offPlan: Boolean = false, val eatenAt: String? = null,
 )
 
 data class ExtractedActivity(val kind: String, val description: String, val durationMin: Double?, val steps: Int?, val confidence: Double)
@@ -56,6 +57,8 @@ class Extraction {
     var lapseNote = ""
     var coachingModeRequest: String? = null
     var pauseDays: Double? = null
+    /** Voice transcript or photo description written by the LLM (only for media messages). */
+    var mediaSummary: String? = null
     val dropped = mutableListOf<String>()
 
     fun summary(): JSONObject = JSONObject()
@@ -67,6 +70,7 @@ class Extraction {
         .put("commitment_updates", JSONArray(commitmentUpdates.map { "${it.commitmentId}:${it.outcome}" }))
         .put("memories", JSONArray(facts.map { (if (it.temporary) "temporary " else "") + "${it.category}:${it.key}=${it.value}" }))
         .put("lapse", lapse)
+        .put("media", mediaSummary ?: JSONObject.NULL)
         .put("food_corrections", JSONArray(foodCorrections.map { "${it.itemName}->${it.newQuantity}" }))
         .put("profile_updates", JSONArray(profileUpdates.keys))
         .put("dropped", JSONArray(dropped))
@@ -113,6 +117,7 @@ object ExtractionValidator {
                  usualFoods: Set<String> = emptySet()): Extraction {
         val out = Extraction()
         if (raw == null) { out.dropped += "extraction was not an object"; return out }
+        if (message == null) out.mediaSummary = raw.strOrNull("media_summary")?.take(1000)
         fun check(item: JSONObject, what: String): Boolean {
             if (grounded(item.strOrNull("quote"), message)) return true
             out.dropped += "$what: not grounded in the message"
@@ -135,7 +140,7 @@ object ExtractionValidator {
             var pl = item.numOrNull("est_protein_low"); var ph = item.numOrNull("est_protein_high")
             if (pl != null && ph != null && pl > ph) { val t = pl; pl = ph; ph = t }
             out.foods += ExtractedFood(name.take(80), qty, unit, item.strOrNull("meal_slot") ?: "unknown",
-                item.strOrNull("eaten") != "planned", kl to kh, pl to ph, c)
+                item.strOrNull("eaten") != "planned", kl to kh, pl to ph, c, item.boolOr("off_plan"), hhmm(item.strOrNull("eaten_at")))
         }
 
         for (a in raw.arr("activities").objects()) {

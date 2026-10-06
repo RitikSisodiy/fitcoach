@@ -24,6 +24,7 @@ import java.net.URL
 object Updater {
     private const val REPO = "RitikSisodiy/fitcoach"
     private const val LATEST_URL = "https://api.github.com/repos/$REPO/releases/latest"
+    const val RELEASES_PAGE = "https://github.com/$REPO/releases/latest"
     const val BACKGROUND_INTERVAL_MS = 3 * 60 * 60 * 1000L
     const val APP_OPEN_INTERVAL_MS = 10 * 60 * 1000L
     private const val NOTIFICATION_ID = 2001
@@ -52,6 +53,16 @@ object Updater {
         return Release(o.getString("tag_name").removePrefix("v"), apk.getString("browser_download_url"), o.optString("body").take(500))
     }
 
+    /** What the Updates screen shows: versions, last check, and the last problem (never swallowed silently). */
+    data class Status(val current: String, val latest: String?, val checkedAt: Long, val error: String?, val installError: String?) {
+        val updateAvailable: Boolean get() = latest != null && isNewer(latest, current)
+    }
+
+    fun status(ctx: Context): Status {
+        val p = prefs(ctx)
+        return Status(currentVersion(ctx), p.getString("version", null), p.getLong("checked_at", 0L), p.getString("error", null), p.getString("install_error", null))
+    }
+
     /** A newer release found by an earlier check, if any. */
     fun available(ctx: Context): Release? {
         val p = prefs(ctx)
@@ -73,8 +84,15 @@ object Updater {
             val body = if (code == 200) conn.inputStream.bufferedReader().use { it.readText() } else null
             conn.disconnect()
             p.edit().putLong("checked_at", now).apply()
-            val rel = body?.let(::parseRelease) ?: return@withContext available(ctx)
-            p.edit().putString("version", rel.version).putString("url", rel.apkUrl).putString("notes", rel.notes).apply()
+            if (body == null) {
+                p.edit().putString("error", if (code == 403) "GitHub rate limit reached (HTTP 403); try again in an hour" else "GitHub answered HTTP $code").apply()
+                return@withContext available(ctx)
+            }
+            val rel = parseRelease(body) ?: run {
+                p.edit().putString("error", "The latest release has no APK attached").apply()
+                return@withContext available(ctx)
+            }
+            p.edit().putString("version", rel.version).putString("url", rel.apkUrl).putString("notes", rel.notes).remove("error").apply()
             if (isNewer(rel.version, currentVersion(ctx)) && p.getString("notified", null) != rel.version) {
                 p.edit().putString("notified", rel.version).apply()
                 Notifier.show(ctx, Outbound("FitCoach ${rel.version} is available. Open the app and tap Update."), quiet = false, id = NOTIFICATION_ID)
@@ -82,6 +100,7 @@ object Updater {
             available(ctx)
         } catch (e: Exception) {
             Log.w("FitCoach", "update check failed", e)
+            p.edit().putLong("checked_at", now).putString("error", "Could not reach GitHub: ${e.javaClass.simpleName} ${e.message ?: ""}".trim()).apply()
             available(ctx)
         }
     }
@@ -95,6 +114,7 @@ object Updater {
 
     /** Downloads the APK and hands it to the system installer (the user confirms once). Call from the foreground. */
     suspend fun downloadAndInstall(ctx: Context, rel: Release, onProgress: (Int) -> Unit) = withContext(Dispatchers.IO) {
+        prefs(ctx).edit().remove("install_error").apply()
         val file = File(ctx.cacheDir, "update.apk")
         val conn = URL(rel.apkUrl).openConnection() as HttpURLConnection
         conn.connectTimeout = 15_000; conn.readTimeout = 30_000
@@ -131,7 +151,19 @@ class InstallReceiver : BroadcastReceiver() {
                 context.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
             PackageInstaller.STATUS_SUCCESS -> Unit // the app restarts on the new version
-            else -> Log.w("FitCoach", "update install failed: ${intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)}")
+            else -> {
+                val code = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+                val why = when (code) {
+                    PackageInstaller.STATUS_FAILURE_CONFLICT, PackageInstaller.STATUS_FAILURE_INCOMPATIBLE ->
+                        "The installed app is signed with a different key (an old manual build). Uninstall it once, install the latest release, and updates will work from then on."
+                    PackageInstaller.STATUS_FAILURE_ABORTED -> "Installation was cancelled."
+                    PackageInstaller.STATUS_FAILURE_STORAGE -> "Not enough storage to install the update."
+                    else -> "Install failed: ${intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: code}"
+                }
+                Log.w("FitCoach", "update install failed: $why")
+                context.getSharedPreferences("updates", Context.MODE_PRIVATE).edit().putString("install_error", why).apply()
+                com.fitcoach.app.FitCoachApp.instance.notifyDataChanged()
+            }
         }
     }
 }

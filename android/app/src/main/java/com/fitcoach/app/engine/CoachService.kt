@@ -26,12 +26,13 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * A message to deliver. [channel]: "app" (the user is in the app chat), "notification", or "telegram".
+ * A message to deliver. [channel]: "app" (the user is in the app chat), "notification", "telegram", or "call"
+ * (ring the user; [callId] is the row in `calls`, [text] is why the coach is calling).
  * [quickReplies] are tap-to-send answers written by the LLM; a tap is handled exactly like a typed message.
  */
 data class Outbound(
     val text: String, val channel: String = "app", val quickReplies: List<String> = emptyList(),
-    val interventionId: Long? = null, val messageId: Long? = null,
+    val interventionId: Long? = null, val messageId: Long? = null, val callId: Long? = null,
 )
 
 data class Inbound(
@@ -51,7 +52,7 @@ class CoachService(
     val store: Store,
     val llm: LlmProvider,
     val foods: FoodTable,
-    prompts: Prompts,
+    private val prompts: Prompts,
     val learner: SlotLearner = SlotLearner(store),
     private val ignoreAfter: Duration = Duration.ofMinutes(180),
     private val minGap: Duration = Duration.ofMinutes(60),
@@ -62,7 +63,6 @@ class CoachService(
     private val lock = Mutex()
 
     companion object {
-        val MEAL_SLOT_TIMES = mapOf("breakfast" to "09:00", "lunch" to "13:30", "snack" to "17:30", "dinner" to "21:00", "drink" to "16:00")
         private val MINUTES_RE = Regex("(\\d+)\\s*(?:min|minute|mins|minutes)", RegexOption.IGNORE_CASE)
 
         /** Agent wake-up rules (infrastructure, not coaching): see docs/AGENT.md. */
@@ -172,17 +172,48 @@ class CoachService(
         if (msg.externalId != null && store.messageExists(msg.externalId)) return@withLock emptyList()
         val hist = history()
         val storedText = msg.text.ifBlank { "[${msg.kind}]" }
-        val commitments = store.activeCommitments()
         val profile = store.profile()
-        val usual = profile.optJSONObject("usual_meals") ?: JSONObject()
-        val usualFoods = usual.keys().asSequence().flatMap { slot ->
-            val a = usual.optJSONArray(slot) ?: JSONArray()
-            (0 until a.length()).mapNotNull { a.optJSONObject(it)?.optString("name")?.lowercase() }.asSequence()
-        }.toSet()
-        val ctx = JSONObject()
+        val (extraction, aiDown) = understand(now, msg.text, msg.media)
+        // Data integrity: a "change" to the mode that is already active is a no-op the LLM sometimes invents.
+        if (extraction.coachingModeRequest == profile.optString("coaching_mode", "normal")) extraction.coachingModeRequest = null
+
+        // Media: the multimodal extraction call also transcribes voice / describes photos, so the rest of the pipeline
+        // (memory, reply, later retrieval) works on the content without sending the media twice.
+        val media = extraction.mediaSummary
+        val storedContent = when {
+            media == null -> storedText
+            msg.kind == "voice" -> listOf(msg.text, media).filter { it.isNotBlank() }.joinToString("\n")
+            else -> listOf(msg.text, "[${msg.kind}] $media").filter { it.isNotBlank() }.joinToString("\n")
+        }
+        val guidance = store.transaction {
+            val mid = store.addMessage(now, "in", msg.kind, storedContent, msg.externalId, channel = msg.channel)
+            store.markOpenAnswered(now)
+            store.addObservation(now, "user_message", "${msg.channel}: ${storedContent.take(120)}", significant = false)
+            applyExtraction(now, extraction, mid)
+        }
+        val data = if (extraction.dataNeeded.isNotEmpty()) runQueries(now, extraction.dataNeeded) else null
+        val (reply, problems) = if (aiDown) null to listOf("llm_error") else coach.reply(
+            when {
+                media != null && msg.kind == "voice" -> "(voice note) $media"
+                media != null -> listOf(msg.text, "(sent a ${msg.kind}: $media)").filter { it.isNotBlank() }.joinToString("\n")
+                msg.media.isNotEmpty() -> listOf(msg.text, "(sent a ${msg.kind}, but its content could not be read)").filter { it.isNotBlank() }.joinToString("\n")
+                else -> msg.text
+            },
+            buildContext(now), extraction.summary(), hist, guidance, data,
+        )
+        if (problems.isNotEmpty()) store.logDecision(now, "reply_problem", problems.joinToString("; ").take(300))
+        store.logDecision(now, "reply", guidance.joinToString("; ").ifEmpty { "plain reply" }, JSONObject().put("extraction", extraction.summary()))
+        val text = reply ?: if (problems.any { it.startsWith("llm_error") }) Coach.AI_UNAVAILABLE else Coach.NO_SAFE_REPLY
+        listOf(send(now, text, if (reply == null) "system" else "text", msg.channel))
+    }
+
+    /** Understand: what the extractor needs to know, so the same step serves chat, Telegram and voice calls. */
+    private fun extractionContext(now: Instant): JSONObject {
+        val profile = store.profile()
+        return JSONObject()
             .put("LOCAL_TIME", lt(now, "EEE HH:mm"))
             .put("KNOWN_TAGS", JSONArray(store.knownTags()))
-            .put("ACTIVE_COMMITMENTS", JSONArray(commitments.map { it.asContext() }))
+            .put("ACTIVE_COMMITMENTS", JSONArray(store.activeCommitments().map { it.asContext() }))
             .put("OPEN_NUDGES", JSONArray(store.openInterventions().filter { it.str("kind") != "contextual" }.map {
                 JSONObject().put("intervention_id", it.long("id")).put("commitment_id", it.long("commitment_id")).put("text", it.str("message_text"))
                     .put("quick_replies", it.str("quick_replies_json")?.let(::JSONArray) ?: JSONArray())
@@ -194,38 +225,30 @@ class CoachService(
             .put("FOOD_LOGGED_TODAY", JSONArray(store.foodOn(store.date(now)).map {
                 JSONObject().put("item", it.str("item_name")).put("quantity", it.dbl("quantity")).put("unit", it.str("unit")).put("meal", it.str("meal_slot"))
             }))
-            .put("USUAL_MEALS", usual)
+            .put("USUAL_MEALS", profile.optJSONObject("usual_meals") ?: JSONObject())
+            .put("GOAL", JSONObject().put("goal", profile.opt("goal_text")).put("goal_weight_kg", profile.opt("goal_weight_kg")))
             .put("ACTIVE_MEMORY", JSONArray(store.activeFacts(now).filter { it.str("category") != "coach_insight" }.map {
                 JSONObject().put("key", it.str("key")).put("value", it.str("value")).put("temporary", it.str("valid_until") != null)
             }))
-        var aiDown = false
-        val extraction = try {
-            extractor.extract(msg.text, msg.media, ctx, commitments.map { it.id }.toSet(), usualFoods).first
-        } catch (e: CapabilityException) {
-            store.logDecision(now, "capability_error", "Media not supported: ${e.message}")
-            Extraction().also { it.dropped += "media not supported" }
-        } catch (e: LlmException) {
-            aiDown = true
-            store.logDecision(now, "extraction_failed", "Extraction failed: ${e.message}")
-            Extraction().also { it.dropped += "extraction failed" }
-        }
-        // Data integrity: a "change" to the mode that is already active is a no-op the LLM sometimes invents.
-        if (extraction.coachingModeRequest == profile.optString("coaching_mode", "normal")) extraction.coachingModeRequest = null
+    }
 
-        val guidance = store.transaction {
-            val mid = store.addMessage(now, "in", msg.kind, storedText, msg.externalId, channel = msg.channel)
-            store.markOpenAnswered(now)
-            store.addObservation(now, "user_message", "${msg.channel}: ${storedText.take(120)}", significant = false)
-            applyExtraction(now, extraction, mid)
-        }
-        val data = if (extraction.dataNeeded.isNotEmpty()) runQueries(now, extraction.dataNeeded) else null
-        val (reply, problems) = if (aiDown) null to listOf("llm_error") else coach.reply(
-            msg.text.ifBlank { "(sent a ${msg.kind})" }, buildContext(now), extraction.summary(), hist, guidance, data,
-        )
-        if (problems.isNotEmpty()) store.logDecision(now, "reply_problem", problems.joinToString("; ").take(300))
-        store.logDecision(now, "reply", guidance.joinToString("; ").ifEmpty { "plain reply" }, JSONObject().put("extraction", extraction.summary()))
-        val text = reply ?: if (problems.any { it.startsWith("llm_error") }) Coach.AI_UNAVAILABLE else Coach.NO_SAFE_REPLY
-        listOf(send(now, text, if (reply == null) "system" else "text", msg.channel))
+    private fun usualFoods(): Set<String> {
+        val usual = store.profile().optJSONObject("usual_meals") ?: JSONObject()
+        return usual.keys().asSequence().flatMap { slot ->
+            val a = usual.optJSONArray(slot) ?: JSONArray()
+            (0 until a.length()).mapNotNull { a.optJSONObject(it)?.optString("name")?.lowercase() }.asSequence()
+        }.toSet()
+    }
+
+    /** Returns (validated extraction, AI unavailable?). */
+    private suspend fun understand(now: Instant, text: String, media: List<MediaPart>, promptText: String? = null): Pair<Extraction, Boolean> = try {
+        extractor.extract(text, media, extractionContext(now), store.activeCommitments().map { it.id }.toSet(), usualFoods(), promptText).first to false
+    } catch (e: CapabilityException) {
+        store.logDecision(now, "capability_error", "Media not supported: ${e.message}")
+        Extraction().also { it.dropped += "media not supported" } to false
+    } catch (e: LlmException) {
+        store.logDecision(now, "extraction_failed", "Extraction failed: ${e.message}")
+        Extraction().also { it.dropped += "extraction failed" } to true
     }
 
     private fun send(now: Instant, text: String, kind: String, channel: String, quickReplies: List<String> = emptyList(), iid: Long? = null): Outbound {
@@ -242,11 +265,11 @@ class CoachService(
         val unknown = mutableListOf<String>()
         for (f in ex.foods.filter { it.eaten }) {
             val est = foods.estimate(f.name, f.quantity, f.unit, f.estKcal, f.estProtein, f.confidence)
-            store.addFood(now, mealTime(now, f.mealSlot), mapOf(
+            store.addFood(now, mealTime(now, f.mealSlot, f.eatenAt), mapOf(
                 "meal_slot" to f.mealSlot, "item_name" to f.name, "food_key" to est.foodKey, "quantity" to f.quantity, "unit" to f.unit,
                 "kcal_low" to est.kcalLow, "kcal_high" to est.kcalHigh, "protein_low" to est.proteinLow, "protein_high" to est.proteinHigh,
                 "nutrition_source" to est.source, "data_status" to if (est.kcalLow != null) "estimated" else "unknown",
-                "confidence" to est.confidence, "source_message_id" to mid,
+                "confidence" to est.confidence, "source_message_id" to mid, "off_plan" to f.offPlan,
             ))
             if (est.kcalLow == null) unknown += f.name
         }
@@ -361,13 +384,21 @@ class CoachService(
     }
 
     // ======================================================= extraction helpers
-    private fun mealTime(now: Instant, slot: String?): Instant {
-        val hhmm = MEAL_SLOT_TIMES[slot] ?: return now
+    /**
+     * When a reported meal happened: the time the user said (eaten_at), else this user's own typical time for that
+     * meal (median of what they logged in the last 30 days), else now. A time later than now means yesterday.
+     */
+    private fun mealTime(now: Instant, slot: String?, eatenAt: String?): Instant {
         val local = now.atZone(store.tz)
-        if (slot == "dinner" && local.hour < 4) return local.minusDays(1).withHour(21).withMinute(0).withSecond(0).withNano(0).toInstant()
+        val hhmm = eatenAt ?: slot?.let { s ->
+            store.query("SELECT occurred_at FROM food_events WHERE meal_slot = ? AND source = 'user_entered' AND local_date >= ?",
+                s, TimeUtil.daysAgo(store.date(now), 30))
+                .map { TimeUtil.localTime(TimeUtil.parse(it.str("occurred_at")!!), store.tz).let { t -> t.hour * 60 + t.minute } }
+                .sorted().takeIf { it.size >= 3 }?.let { m -> "%02d:%02d".format(m[m.size / 2] / 60, m[m.size / 2] % 60) }
+        } ?: return now
         val t = TimeUtil.hhmm(hhmm)
         val cand = local.withHour(t.hour).withMinute(t.minute).withSecond(0).withNano(0)
-        return if (!cand.isAfter(local)) cand.toInstant() else now
+        return if (!cand.isAfter(local)) cand.toInstant() else if (eatenAt != null) cand.minusDays(1).toInstant() else now
     }
 
     private fun applyFoodCorrection(now: Instant, c: FoodCorrection): String {
@@ -528,14 +559,10 @@ class CoachService(
             }
             store.markJob(now, "place_enter", "$tag|${TimeUtil.iso(at)}")
         } else {
-            // A stay of 20+ minutes at a gym counts as a workout session (observed).
+            // How long they stayed is the fact; what it means (a workout? a long meeting?) is the agent's call.
             val enter = store.contextSince(today).lastOrNull { it.str("tag") == tag && it.str("source") == "geofence" } ?: return@withLock
             val minutes = Duration.between(TimeUtil.parse(enter.str("occurred_at")!!), at).toMinutes()
-            store.addObservation(at, "place_leave", "left $tag at $hint after $minutes min")
-            if (minutes >= 20 && ("gym" in tag || "fitness" in tag || "yoga" in tag)) {
-                store.upsertHealth(now, "exercise", "place|$tag|${enter.str("occurred_at")}", TimeUtil.parse(enter.str("occurred_at")!!), at, at,
-                    minutes.toDouble(), JSONObject().put("type", "WORKOUT").put("source", "place:$tag"))
-            }
+            store.addObservation(at, "place_leave", "left $tag at $hint after staying $minutes min")
         }
     }
 
@@ -556,7 +583,9 @@ class CoachService(
      * Code only enforces limits (pause, quiet hours, daily cap, minimum gap, quota); it never picks the message.
      */
     suspend fun tick(now: Instant, force: Boolean = false): List<Outbound> = lock.withLock {
+        store.setKv(now, "last_tick_at", TimeUtil.iso(now))
         expireInterventions(now)
+        expireCalls(now)
         dailyJobs(now)
         autoCompleteFromHealth(now)
         processInferred(now)
@@ -596,6 +625,7 @@ class CoachService(
             return@withLock emptyList()
         }
         scheduleCheck(now, d.nextCheckMinutes, d.nextCheckReason)
+        applyAgentOutcomes(now, d)
         val canSend = limits.getBoolean("can_send_now")
         val data = d.asJson().put("woke_for", why)
         if (!d.act || d.message.isNullOrBlank()) {
@@ -606,7 +636,11 @@ class CoachService(
             store.logDecision(now, "agent_blocked", "Wanted to send but ${limits.optString("why_not")}: ${d.reason}", data)
             return@withLock emptyList()
         }
-        val channel = if (d.channel == "telegram" && channels().getBoolean("telegram_linked")) "telegram" else "notification"
+        val channel = when {
+            d.channel == "call" && limits.optBoolean("can_call_now") -> "call"
+            d.channel == "telegram" && channels().getBoolean("telegram_linked") -> "telegram"
+            else -> "notification"
+        }
         val iid = store.addIntervention(now, mapOf(
             "commitment_id" to d.commitmentId?.takeIf { id -> store.commitment(id) != null }, "kind" to "proactive", "intent" to d.intent,
             "level" to 0, "slot" to TimeUtil.slotOf(TimeUtil.localTime(now, store.tz)), "style" to d.intent, "message_text" to d.message,
@@ -614,7 +648,20 @@ class CoachService(
             "quick_replies_json" to JSONArray(d.quickReplies).toString(), "expected_outcome" to d.expectedOutcome,
         ))
         store.logDecision(now, "agent_act", "${d.intent} via $channel: ${d.reason}", data)
-        listOf(send(now, d.message, "nudge", channel, d.quickReplies, iid))
+        val out = send(now, d.message, "nudge", channel, d.quickReplies, iid)
+        if (channel != "call") return@withLock listOf(out)
+        listOf(out.copy(callId = store.insert("calls", mapOf("intervention_id" to iid, "status" to "ringing",
+            "purpose" to "${d.message}\n(Your reasoning: ${d.reason})", "rang_at" to TimeUtil.iso(now)))))
+    }
+
+    /** Commitments the agent judged settled from observations (validated: active commitment, not yet reported today). */
+    private fun applyAgentOutcomes(now: Instant, d: AgentDecision) {
+        val today = store.date(now)
+        d.commitmentOutcomes.forEach { (cid, outcome, evidence) ->
+            if (store.commitment(cid)?.status != "active" || store.commitmentOutcome(cid, today) != null) return@forEach
+            recordOutcome(now, cid, outcome, "inferred_by_agent", evidence)
+            store.logDecision(now, "agent_inferred_outcome", "Commitment $cid $outcome: $evidence")
+        }
     }
 
     private fun scheduleCheck(now: Instant, minutes: Int, reason: String) {
@@ -638,17 +685,92 @@ class CoachService(
             recentDays -> "user is ${eng.state}; at most one message every ${eng.minDaysBetween} days"
             else -> null
         }
+        // Calls interrupt more than texts: at most one a day, only if the user allows calls.
+        val callsToday = store.query("SELECT COUNT(*) AS n FROM calls WHERE rang_at >= ? AND intervention_id IS NOT NULL", TimeUtil.iso(TimeUtil.atLocal(today, "00:00", store.tz))).first().long("n") ?: 0L
+        val callsAllowed = profile.optBoolean("calls_allowed", true)
         return JSONObject().put("can_send_now", whyNot == null).put("why_not", whyNot ?: JSONObject.NULL)
+            .put("can_call_now", whyNot == null && callsAllowed && callsToday == 0L && callsSupported())
+            .put("calls_today", callsToday)
             .put("messages_sent_today", sent).put("daily_cap", eng.dailyBudget)
             .put("minutes_since_last_message", sinceLast ?: JSONObject.NULL)
             .put("quiet_hours", "${profile.optString("quiet_start", "22:30")}-${profile.optString("quiet_end", "07:30")}")
     }
 
-    /** Which channels the agent can use; set by the Android layer (Telegram pairing). */
+    /** Which channels the agent can use; set by the Android layer (Telegram pairing, call permissions). */
     var telegramLinked: () -> Boolean = { false }
+    var callsSupported: () -> Boolean = { false }
 
     private fun channels(): JSONObject = JSONObject().put("telegram_linked", telegramLinked())
         .put("last_inbound_channel", store.lastInboundChannel() ?: JSONObject.NULL)
+
+    // ============================================================ voice calls
+    /**
+     * Voice calls are one more channel of the same agent (docs/AGENT.md): the agent decides to call, the user answers a
+     * live Gemini voice session, and the transcript goes through the same understand -> remember path as any message.
+     */
+    fun startUserCall(now: Instant): Long = store.insert("calls", mapOf("status" to "answered", "purpose" to
+        "The user started this call from the app. Ask what they want to talk about, or bring up what matters most right now.",
+        "rang_at" to TimeUtil.iso(now), "answered_at" to TimeUtil.iso(now)))
+
+    fun call(id: Long): Row? = store.one("SELECT * FROM calls WHERE id = ?", id)
+
+    /** Ringing -> answered / declined / missed. A call that did not happen is an observation the agent reasons about. */
+    fun setCallStatus(now: Instant, id: Long, status: String) {
+        val row = call(id) ?: return
+        if (row.str("status") != "ringing") return
+        if (status == "answered") {
+            store.exec("UPDATE calls SET status = 'answered', answered_at = ? WHERE id = ?", TimeUtil.iso(now), id)
+            return
+        }
+        store.exec("UPDATE calls SET status = ?, ended_at = ? WHERE id = ?", status, TimeUtil.iso(now), id)
+        store.addObservation(now, "call_$status", "The user $status the coach's voice call (you called about: ${row.str("purpose")?.lineSequence()?.first()})")
+    }
+
+    private fun expireCalls(now: Instant) {
+        store.query("SELECT id, rang_at FROM calls WHERE status = 'ringing'").forEach {
+            if (Duration.between(TimeUtil.parse(it.str("rang_at")!!), now) > Duration.ofMinutes(3)) setCallStatus(now, it.long("id")!!, "missed")
+        }
+    }
+
+    /** System instruction for the live voice session: why the coach called plus the same context and memory as chat. */
+    fun callInstruction(now: Instant, id: Long): String {
+        val ctx = buildContext(now).put("recent_conversation", JSONArray(store.recentMessages(12).map {
+            "${if (it.str("direction") == "in") "user" else "coach"} (${it.str("channel")}): ${it.str("text")}"
+        }))
+        return prompts.callSystem.replace("{{PURPOSE}}", call(id)?.str("purpose") ?: "not recorded").replace("{{CONTEXT}}", ctx.toString(1))
+    }
+
+    /**
+     * After the call: store the turns as messages, extract facts/food/commitments from the whole transcript (grounded in
+     * what the user said), mark the coach's call answered, and leave an observation so the agent decides any follow-up.
+     */
+    suspend fun ingestCall(now: Instant, id: Long, turns: List<Pair<String, String>>, summary: String?, model: String?): Unit = lock.withLock {
+        val row = call(id) ?: return@withLock
+        if (row.str("ended_at") != null) return@withLock
+        val transcript = JSONArray(turns.map { (role, text) -> JSONObject().put("role", role).put("text", text) })
+        val userText = turns.filter { it.first == "user" }.joinToString("\n") { it.second }
+        store.exec("UPDATE calls SET status = 'ended', ended_at = ?, model = ?, summary = ?, transcript_json = ? WHERE id = ?",
+            TimeUtil.iso(now), model, summary, transcript.toString(), id)
+        if (userText.isBlank()) {
+            store.addObservation(now, "call_silent", "Voice call ended without the user saying anything")
+            return@withLock
+        }
+        val (extraction, _) = understand(now, userText, emptyList(),
+            promptText = "(Transcript of a voice call between the coach and the user)\n" + turns.joinToString("\n") { "${it.first}: ${it.second}" })
+        val applied = store.transaction {
+            var firstIn: Long? = null
+            turns.forEach { (role, text) ->
+                val mid = store.addMessage(now, if (role == "user") "in" else "out", "call", text, channel = "call",
+                    interventionId = row.long("intervention_id"))
+                if (role == "user" && firstIn == null) firstIn = mid
+            }
+            store.markOpenAnswered(now)
+            applyExtraction(now, extraction, firstIn!!)
+        }
+        store.addObservation(now, "call_ended", "Voice call ended. Summary: ${summary ?: userText.take(200)}")
+        store.logDecision(now, "call_ingested", "Call $id: ${turns.size} turns; ${applied.joinToString("; ").ifEmpty { "nothing to store" }}",
+            JSONObject().put("extraction", extraction.summary()))
+    }
 
     /** Learn: once a day, the LLM rewrites the coach insights from the evaluated outcomes of recent interventions. */
     private suspend fun reflectIfDue(now: Instant) {

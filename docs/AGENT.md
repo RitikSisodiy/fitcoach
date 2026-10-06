@@ -1,6 +1,6 @@
 # The agent (v2)
 
-One backend on the phone serves every channel: the app chat, notifications (with tap-to-reply) and Telegram. There is one SQLite DB, one memory, one agent and one conversation. The LLM does the reasoning and all coaching words. Code observes, stores, validates, enforces limits and keeps the statistics the agent learns from.
+One backend on the phone serves every channel: the app chat, notifications (with tap-to-reply), Telegram and voice calls. There is one SQLite DB, one memory, one agent and one conversation. The LLM does the reasoning and all coaching words. Code observes, stores, validates, enforces limits and keeps the statistics the agent learns from.
 
 ## Loop
 
@@ -15,7 +15,7 @@ Retrieve  every reply and every decision gets the memory tiers, a 7-day digest, 
 Reason/   Agent.decide(SITUATION) -> act? message, quick replies, channel, expected outcome,
 Decide      and next_check_minutes + reason (the agent picks its own next wake-up)
 Limits    code: pause, quiet hours, daily cap per coaching mode/engagement, minimum gap, safety guard, eval quota
-Send      notification (quick replies as actions) or Telegram (inline keyboard); always also in the app chat
+Send      notification (quick replies as actions), Telegram (inline keyboard) or a voice call; always also in the app chat
 Observe   reply / tap (any channel) -> answered + response minutes; nothing within 3 h -> ignored
 response
 Evaluate  commitment done that day -> achieved (credits the slot learner), else not_achieved
@@ -52,10 +52,28 @@ The agent writes up to 3 quick replies per message. A tap is the user's own mess
 - **Inbound:** text, voice and photo from the paired chat go to `handleMessage(channel="telegram")`.
 - **Outbound:** replies go back to Telegram. Proactive messages go there when the agent chooses the Telegram channel.
 
+## Media (D-039)
+Photos and voice notes from any channel go to the multimodal extraction call. That call also writes `media_summary` (a transcript, or what the photo shows). The summary is stored as the message content and handed to the reply, so memory and later answers work on what was in the media.
+
+## Voice calls (D-038)
+```
+agent decides channel "call" (only if limits.can_call_now) -> calls row "ringing" -> CallStyle notification / full screen
+  declined | missed (3 min)            -> observation -> the agent reconsiders (maybe a text later, maybe nothing)
+  answered -> VoiceCallService + Gemini Live (call_system.txt: why it called + context + memory)
+           -> live transcript on screen; the coach ends with end_call(summary)
+           -> ingestCall: turns stored as messages (channel call), extraction over the transcript (grounded in the
+              user's words), the intervention marked answered, call_ended observation -> next decision
+```
+The user can also start a call from Chat (📞). Calls have no fixed times or scripts: the coach only gets the reason it chose to call.
+
+## Agent-settled commitments
+The agent can report `commitment_outcomes` (done, smaller or skipped, with evidence) when observations show what happened: a place stay, a workout, a call. Code accepts only active commitments with no report yet that day.
+
 ## Files
 - `engine/Agent.kt`: situation builder, decision, reflection, response statistics.
 - `engine/CoachService.kt`: message pipeline, tick, limits, outcome evaluation, memory retrieval.
 - `engine/Dashboard.kt` and `ui/DashboardScreen.kt`: everything above made visible.
+- `voice/`: Live session (WebSocket), call audio, ringing and decline, the call service and the call screen.
 - `telegram/`: Bot API client, bridge (pairing, updates, quick-reply callbacks), service, and channel delivery.
 - `assets/prompts/`:
   - `coach_system.txt`

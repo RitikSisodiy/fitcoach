@@ -13,6 +13,7 @@ import com.fitcoach.app.FitCoachApp
 import com.fitcoach.app.R
 import com.fitcoach.app.engine.Outbound
 import com.fitcoach.app.notify.Notifier
+import com.fitcoach.app.voice.CallManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -46,6 +47,10 @@ class PrefsTelegramSettings(ctx: Context) : TelegramSettings {
 object Telegram {
     fun settings(ctx: Context) = PrefsTelegramSettings(ctx)
     fun isLinked(ctx: Context) = settings(ctx).let { it.token != null && it.chatId != null }
+
+    /** Polling health for the dashboard (this process only). */
+    @Volatile var lastPollAt: Long = 0L
+    @Volatile var lastPollError: String? = null
 
     fun bridge(ctx: Context): TelegramBridge? {
         val s = settings(ctx)
@@ -99,9 +104,12 @@ class TelegramService : Service() {
                     settings.offset = u.optLong("update_id") + 1
                 }
                 if (updates.isNotEmpty()) FitCoachApp.instance.notifyDataChanged()
+                Telegram.lastPollAt = System.currentTimeMillis()
+                Telegram.lastPollError = null
                 backoff = 5_000L
             } catch (e: Exception) {
                 Log.w("FitCoach", "telegram poll failed: ${e.message}")
+                Telegram.lastPollError = e.message ?: e.javaClass.simpleName
                 delay(backoff)
                 backoff = minOf(backoff * 2, 300_000L)
             }
@@ -123,6 +131,7 @@ object Delivery {
             val sent = runCatching { Telegram.bridge(ctx)?.deliver(out) == true }.getOrElse { Log.w("FitCoach", "telegram send failed", it); false }
             if (sent) return
         }
+        if (out.channel == "call") return CallManager.ring(ctx, out)
         if (out.channel != "app") Notifier.show(ctx, out)
     }
 }

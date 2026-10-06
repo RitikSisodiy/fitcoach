@@ -14,6 +14,7 @@ import com.fitcoach.app.llm.LlmRequest
 import com.fitcoach.app.llm.LlmResponse
 import com.fitcoach.app.notify.Notifier
 import com.fitcoach.app.telegram.Telegram
+import com.fitcoach.app.voice.CallManager
 import com.fitcoach.app.work.Scheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,6 +45,7 @@ class FitCoachApp : Application() {
         foods = assets.open("foods_seed.csv").use(FoodTable::load)
         prompts = Prompts.fromAssets(assets)
         Notifier.createChannels(this)
+        CallManager.createChannel(this)
         Scheduler.ensureScheduled(this)
         Telegram.ensureRunning(this)
     }
@@ -64,6 +66,7 @@ class FitCoachApp : Application() {
         val llm: LlmProvider = if (key == null) NoKeyProvider else GeminiProvider(key, usageFile = File(filesDir, "gemini_usage.json"))
         return CoachService(store, llm, foods, prompts).also {
             it.telegramLinked = { Telegram.isLinked(this) }
+            it.callsSupported = { CallManager.canCall(this) }
             cachedService = it; cachedKey = key
         }
     }

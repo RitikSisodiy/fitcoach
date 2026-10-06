@@ -38,6 +38,14 @@ import com.fitcoach.app.engine.Dashboard
 import com.fitcoach.app.engine.DashboardData
 import com.fitcoach.app.engine.Progress
 import com.fitcoach.app.work.Scheduler
+import com.fitcoach.app.notify.Notifier
+import com.fitcoach.app.sensors.ActivityTracker
+import com.fitcoach.app.sensors.CalendarReader
+import com.fitcoach.app.sensors.FoodNotificationListener
+import com.fitcoach.app.sensors.HealthSync
+import com.fitcoach.app.sensors.Places
+import com.fitcoach.app.telegram.Telegram
+import com.fitcoach.app.voice.CallManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Instant
@@ -49,7 +57,15 @@ fun DashboardScreen(app: FitCoachApp) {
     val version by app.dataVersion.collectAsState()
     var data by remember { mutableStateOf<DashboardData?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var access by remember { mutableStateOf(emptyList<Pair<String, Boolean>>()) }
     LaunchedEffect(version) {
+        val hc = runCatching { HealthSync.granted(ctx).size >= 4 }.getOrDefault(false)
+        access = listOf(
+            "Notifications" to Notifier.canPost(ctx), "Health Connect" to hc, "Walk/run detection" to ActivityTracker.hasPermission(ctx),
+            "Background location" to Places.hasBackground(ctx), "Calendar" to CalendarReader.hasPermission(ctx),
+            "Food-order notifications" to FoodNotificationListener.enabled(ctx), "Microphone (calls)" to CallManager.hasMic(ctx),
+            "Full-screen calls" to CallManager.canFullScreen(ctx), "Telegram linked" to Telegram.isLinked(ctx),
+        )
         withContext(Dispatchers.IO) {
             runCatching { Dashboard.build(app.service(), Instant.now()) }.onSuccess { data = it; error = null }.onFailure { error = it.message }
         }
@@ -63,6 +79,9 @@ fun DashboardScreen(app: FitCoachApp) {
                 Text("Coaching: ${d.mode}" + (d.pausedUntil?.let { " · paused until $it" } ?: ""))
                 Text("Agent: next look ${d.agentNextCheck ?: "soon"}" + (d.agentPlan?.let { " - $it" } ?: ""), style = MaterialTheme.typography.bodySmall)
             }
+        }
+        item {
+            Section("Progress") { d.kpis.forEach { (k, v) -> Row { Text("$k: ", style = MaterialTheme.typography.labelLarge); Text(v) } } }
         }
         item { Section("Today") { d.today.forEach { (k, v) -> Row { Text("$k: ", style = MaterialTheme.typography.labelLarge); Text(v) } } } }
         item {
@@ -108,11 +127,21 @@ fun DashboardScreen(app: FitCoachApp) {
             }
         }
         item { Section("Messages the coach sent, and what happened") { Bullets(null, d.interventions, "none yet") } }
+        item { Section("Voice calls") { Bullets(null, d.calls, "no calls yet - the coach calls only when it decides talking would help; 📞 in Chat to call it") } }
         item { Section("What the coach observed") { Bullets(null, d.observations, "nothing yet") } }
         item {
             Section("Agent decisions") {
                 Bullets(null, d.decisions, "none yet")
                 Text("AI quota: ${d.quota}", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        item {
+            Section("Data sources") {
+                d.sources.forEach { (k, v) -> Row { Text("$k: ", style = MaterialTheme.typography.labelLarge); Text(v) } }
+                val poll = Telegram.lastPollAt
+                if (Telegram.isLinked(ctx)) Text("Telegram polling: " + (Telegram.lastPollError?.let { "failing ($it)" }
+                    ?: if (poll == 0L) "not running in this app session" else "ok, ${(System.currentTimeMillis() - poll) / 60_000} min ago"))
+                Text("Access: " + access.joinToString { "${it.first} ${if (it.second) "✓" else "✗"}" }, style = MaterialTheme.typography.bodySmall)
                 Button(onClick = { Scheduler.runNow(ctx) }) { Text("Sync sensors now") }
             }
         }

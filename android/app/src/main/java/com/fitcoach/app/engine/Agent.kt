@@ -20,6 +20,8 @@ import java.time.LocalDate
 data class AgentDecision(
     val act: Boolean, val reason: String, val intent: String, val commitmentId: Long?, val message: String?,
     val quickReplies: List<String>, val channel: String, val expectedOutcome: String?, val nextCheckMinutes: Int, val nextCheckReason: String,
+    /** Commitments the agent judged done/skipped from observations, with its evidence: (id, outcome, evidence). */
+    val commitmentOutcomes: List<Triple<Long, String, String>> = emptyList(),
 ) {
     fun asJson(): JSONObject = JSONObject().put("act", act).put("reason", reason).put("intent", intent)
         .put("commitment_id", commitmentId ?: JSONObject.NULL).put("message", message ?: JSONObject.NULL)
@@ -34,10 +36,17 @@ data class AgentDecision(
             commitmentId = if (o.has("commitment_id") && !o.isNull("commitment_id")) o.optLong("commitment_id") else null,
             message = o.optString("message").trim().takeIf { it.isNotEmpty() && it != "null" },
             quickReplies = (o.optJSONArray("quick_replies") ?: JSONArray()).strings().map { it.trim().take(40) }.filter { it.isNotEmpty() }.take(3),
-            channel = if (o.optString("channel") == "telegram") "telegram" else "notification",
+            channel = o.optString("channel").takeIf { it in setOf("telegram", "call") } ?: "notification",
             expectedOutcome = o.optString("expected_outcome").takeIf { it.isNotBlank() && it != "null" }?.take(200),
             nextCheckMinutes = o.optInt("next_check_minutes", 120).coerceIn(15, 720),
             nextCheckReason = o.optString("next_check_reason").take(200),
+            commitmentOutcomes = (o.optJSONArray("commitment_outcomes") ?: JSONArray()).let { a ->
+                (0 until a.length()).mapNotNull { a.optJSONObject(it) }.mapNotNull { c ->
+                    val ev = c.optString("evidence").trim()
+                    val out = c.optString("outcome").takeIf { it in setOf("done", "smaller", "skipped") }
+                    if (!c.has("commitment_id") || out == null || ev.isEmpty()) null else Triple(c.optLong("commitment_id"), out, ev.take(200))
+                }
+            },
         )
     }
 }

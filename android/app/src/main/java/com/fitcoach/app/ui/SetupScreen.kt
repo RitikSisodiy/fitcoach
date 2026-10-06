@@ -27,6 +27,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Switch
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -51,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
 import com.fitcoach.app.FitCoachApp
+import com.fitcoach.app.voice.CallManager
 import com.fitcoach.app.core.strOrNull
 import com.fitcoach.app.data.COACHING_MODES
 import com.fitcoach.app.data.normalizeTag
@@ -88,6 +90,7 @@ fun SetupScreen(app: FitCoachApp) {
     var mode by remember { mutableStateOf("normal") }
     var paused by remember { mutableStateOf(false) }
     var quiet by remember { mutableStateOf("") }
+    var callsAllowed by remember { mutableStateOf(true) }
 
     LaunchedEffect(version, refresh) {
         hcGranted = runCatching { HealthSync.granted(ctx).size }.getOrDefault(0)
@@ -96,6 +99,7 @@ fun SetupScreen(app: FitCoachApp) {
             val p = app.store.profile()
             mode = p.optString("coaching_mode", "normal")
             if (quiet.isEmpty()) quiet = "${p.optString("quiet_start", "22:30")}-${p.optString("quiet_end", "07:30")}"
+            callsAllowed = p.optBoolean("calls_allowed", true)
             paused = p.strOrNull("paused_until")?.let { Instant.parse(it).isAfter(Instant.now()) } ?: false
         }
     }
@@ -105,7 +109,6 @@ fun SetupScreen(app: FitCoachApp) {
     val hcPerms = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) { bump(); Scheduler.runNow(ctx) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("FitCoach ${com.fitcoach.app.update.Updater.currentVersion(ctx)}", style = MaterialTheme.typography.labelMedium)
         Section("1. Gemini API key") {
             Text("Free key from aistudio.google.com. Stored only on this phone.", style = MaterialTheme.typography.bodySmall)
             OutlinedTextField(key, { key = it }, Modifier.fillMaxWidth(), label = { Text("API key") }, singleLine = true,
@@ -113,6 +116,7 @@ fun SetupScreen(app: FitCoachApp) {
             Button(onClick = { app.apiKey = key; bump() }) { Text(if (app.apiKey == null) "Save" else "Update") }
         }
 
+        UpdatesSection(app)
         TelegramSection(app)
 
         Section("2. Let the coach see what the phone sees") {
@@ -144,8 +148,11 @@ fun SetupScreen(app: FitCoachApp) {
             PermRow("Screen time (late-night phone use)", ScreenTime.hasPermission(ctx)) {
                 ctx.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
             }
-            PermRow("Microphone (voice notes)", has(ctx, Manifest.permission.RECORD_AUDIO)) {
+            PermRow("Microphone (voice notes and coach calls)", has(ctx, Manifest.permission.RECORD_AUDIO)) {
                 perms.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
+            }
+            PermRow("Coach calls ring full screen (like a phone call)", CallManager.canFullScreen(ctx)) {
+                if (Build.VERSION.SDK_INT >= 34) ctx.startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:${ctx.packageName}")))
             }
             TextButton(onClick = { bump() }) { Text("Refresh status") }
         }
@@ -210,6 +217,12 @@ fun SetupScreen(app: FitCoachApp) {
                         app.store.setProfile(Instant.now(), "quiet_start", parts[0]); app.store.setProfile(Instant.now(), "quiet_end", parts[1]); bump()
                     }
                 }) { Text("Save") }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Let the coach call me when it decides talking would help", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                Switch(checked = callsAllowed, onCheckedChange = { on ->
+                    scope.launch(Dispatchers.IO) { app.store.setProfile(Instant.now(), "calls_allowed", on); bump() }
+                })
             }
             if (paused) Button(onClick = { scope.launch(Dispatchers.IO) { app.service().resume(Instant.now()); bump() } }) { Text("Resume coach") }
             else OutlinedButton(onClick = { scope.launch(Dispatchers.IO) { app.service().pause(Instant.now(), 3.0); bump() } }) { Text("Pause for 3 days") }

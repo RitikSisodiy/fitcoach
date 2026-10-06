@@ -41,3 +41,22 @@ These remain code because they are not coaching decisions:
 
 ## v2 design (implemented)
 See `docs/AGENT.md`.
+
+## Re-audit for v2.1 (2026-10-07)
+Searched all of `engine/`, `telegram/`, `notify/`, `work/` and the prompts for fixed lists, clock rules and canned text.
+
+| # | Where | Problem | Fix |
+|---|---|---|---|
+| B1 | `Patterns.OFFPLAN_KEYS` | A keyword list (samosa, pizza…) decided what counts as "off-plan". | The LLM sets `off_plan` per food item against the user's goal (D-040). |
+| B2 | `CoachService.MEAL_SLOT_TIMES` | Fixed clock per meal slot (lunch = 13:30…). | The user's stated time, else their own learned median time, else now. |
+| B3 | `onPlaceEvent` leave | Leaving any place whose tag contained "gym" marked a commitment done. | Observation only. The agent decides outcomes from evidence (`commitment_outcomes`). |
+| B4 | Telegram media | Photo: the reply LLM never saw what the photo showed, Flash timed out at 20 s, and errors were swallowed, so there was no reply. | `media_summary`, 60 s media timeout, and an error reply to the user (D-039). |
+| B5 | Updater | Errors were silent and there was no manual check. | Status, errors, "Check now" (D-041). |
+
+Still deterministic, on purpose:
+- infrastructure lines ("AI unavailable", "Connected to Telegram", the update and call screen labels);
+- the notification parser's list of food and UPI apps (an input adapter, not coaching);
+- safety and rate limits;
+- the one-call-a-day cap.
+
+Nothing proactive has a fixed time or fixed text. Whether, when, how (text, Telegram or call) and what to say come from the agent.

@@ -10,6 +10,9 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="com.google.android.gms.permission.ACTIVITY_RECOGNITION" />
@@ -86,6 +89,20 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Personal coach chat over Telegram: keeps a long-poll connection to the user's own bot" />
         </service>
+
+        <!-- Voice calls with the coach (Gemini Live): incoming/in-call screen and the microphone service. -->
+        <activity
+            android:name=".voice.CallActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true" />
+        <service
+            android:name=".voice.VoiceCallService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+        <receiver android:name=".voice.CallActionReceiver" android:exported="false" />
 
         <receiver android:name=".sensors.ActivityTransitionReceiver" android:exported="false" />
         <receiver android:name=".sensors.GeofenceReceiver" android:exported="false" />

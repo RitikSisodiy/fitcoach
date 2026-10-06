@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.fitcoach.app.data.Db
 import com.fitcoach.app.data.Store
+import com.fitcoach.app.data.long
 import com.fitcoach.app.data.str
 import com.fitcoach.app.engine.Coach
 import com.fitcoach.app.engine.CoachService
@@ -235,7 +236,103 @@ class ServiceTest {
         s.setKv(Instant.now(), "k", "v")
         assertEquals("v", s.kv("k"))
         assertTrue(s.addObservation(Instant.now(), "x", "y") > 0)
+        assertTrue(s.insert("calls", mapOf("status" to "ringing", "rang_at" to "2026-10-01T10:00:00Z")) > 0) // v3
+        assertEquals(0L, s.one("SELECT COUNT(*) AS n FROM food_events WHERE off_plan = 1")!!.long("n"))
         db.close()
+    }
+
+    // ----------------------------------------------------------- voice calls
+    private fun callDecision(message: String) = act(message).replace("\"channel\":\"telegram\"", "\"channel\":\"call\"")
+
+    @Test fun agentCallsAndTheConversationBecomesMemory() = runTest {
+        service.callsSupported = { true }
+        llm.decide = callDecision("Aaj ka plan short call pe fix karte hain?")
+        val ring = service.tick(at("2026-10-06", "18:00")).single()
+        assertEquals("call", ring.channel)
+        val id = ring.callId!!
+        assertEquals("ringing", service.call(id)!!.str("status"))
+        assertTrue(service.callInstruction(at("2026-10-06", "18:00"), id).contains("Aaj ka plan short call pe fix karte hain?"))
+
+        service.setCallStatus(at("2026-10-06", "18:01"), id, "answered")
+        llm.extraction = """{"memories":[{"type":"long_term","category":"routine","key":"evening_class","value":"has a guitar class on Monday evenings",
+            "quote":"guitar class hai","confidence":0.9}]}"""
+        service.ingestCall(at("2026-10-06", "18:06"), id, listOf("coach" to "Hi! Aaj shaam ka kya plan hai?", "user" to "Aaj guitar class hai, walk kal karunga"),
+            "User has a guitar class tonight; walk moved to tomorrow.", "gemini-3.8-live")
+        assertTrue(llm.lastExtractRequest!!.userText.contains("coach: Hi! Aaj shaam"))
+        assertEquals("ended", service.call(id)!!.str("status"))
+        assertEquals(2, store.query("SELECT * FROM messages WHERE channel = 'call' AND kind = 'call'").size)
+        assertEquals("answered", store.one("SELECT outcome FROM interventions")!!.str("outcome"))
+        assertEquals(1, service.memory(at("2026-10-06", "18:06")).getJSONArray("long_term").length())
+
+        llm.decide = """{"act":false,"reason":"just talked","next_check_minutes":240,"next_check_reason":"x"}"""
+        service.tick(at("2026-10-06", "18:10")) // the call is a significant observation: the agent re-evaluates
+        assertTrue(llm.lastDecidePrompt.contains("walk moved to tomorrow"))
+    }
+
+    @Test fun callsNeedPermissionAndAreRare() = runTest {
+        llm.decide = callDecision("talk?")
+        assertEquals("notification", service.tick(at("2026-10-06", "10:00")).single().channel) // calls not supported -> text
+        service.callsSupported = { true }
+        assertTrue(llm.lastDecidePrompt.contains("\"can_call_now\": false"))
+        assertEquals("call", service.tick(at("2026-10-06", "12:00"), force = true).single().channel)
+        service.tick(at("2026-10-06", "15:00"), force = true)
+        assertTrue(llm.lastDecidePrompt.contains("\"calls_today\": 1"))
+        assertEquals(1, store.query("SELECT * FROM calls").size) // second call the same day falls back to text
+    }
+
+    @Test fun missedCallIsAnObservationForTheAgent() = runTest {
+        service.callsSupported = { true }
+        llm.decide = callDecision("quick call?")
+        val id = service.tick(at("2026-10-06", "18:00")).single().callId!!
+        llm.decide = """{"act":false,"reason":"wait","next_check_minutes":240,"next_check_reason":"x"}"""
+        service.tick(at("2026-10-06", "18:05"))
+        assertEquals("missed", service.call(id)!!.str("status"))
+        assertTrue(llm.lastDecidePrompt.contains("missed the coach's voice call"))
+    }
+
+    // ------------------------------------------------- media and generic inference
+    @Test fun photoIsDescribedRememberedAndReplied() = runTest {
+        llm.extraction = """{"media_summary":"A plate with two rotis and a bowl of dal","food_items":[
+            {"name":"roti","quote":"two rotis","quantity":2,"unit":"piece","meal_slot":"lunch","eaten":"eaten","confidence":0.7}]}"""
+        service.handleMessage(Inbound("", at("2026-10-06", "13:30"), "photo", listOf(com.fitcoach.app.llm.MediaPart(byteArrayOf(1, 2, 3), "image/jpeg"))))
+        assertEquals(1, llm.lastExtractRequest!!.media.size)
+        assertTrue(store.one("SELECT text FROM messages WHERE direction = 'in'")!!.str("text")!!.contains("[photo] A plate with two rotis"))
+        assertTrue(llm.lastReplyPrompt.contains("sent a photo: A plate with two rotis"))
+        assertEquals(listOf("roti"), store.foodOn("2026-10-06").map { it.str("item_name") })
+    }
+
+    @Test fun mealTimeAndOffPlanComeFromTheLlmNotFromTables() = runTest {
+        llm.extraction = """{"food_items":[{"name":"samosa","quote":"samosa","quantity":2,"unit":"piece","meal_slot":"snack","eaten":"eaten",
+            "confidence":0.9,"off_plan":true,"eaten_at":"16:30"}]}"""
+        service.handleMessage(Inbound("4:30 baje 2 samosa kha liye", at("2026-10-06", "19:00")))
+        val f = store.foodOn("2026-10-06").single()
+        assertEquals(1L, f.long("off_plan"))
+        assertTrue(f.str("occurred_at")!!.startsWith("2026-10-06T11:00")) // 16:30 IST
+    }
+
+    @Test fun agentSettlesACommitmentFromObservations() = runTest {
+        val cid = store.addCommitment(Instant.now(), mapOf("kind" to "habit", "title" to "Gym", "action" to "go to the gym",
+            "schedule_days" to "daily"), listOf("go to the gym"))
+        llm.decide = """{"act":false,"reason":"left the gym after 70 min","next_check_minutes":240,"next_check_reason":"x",
+            "commitment_outcomes":[{"commitment_id":$cid,"outcome":"done","evidence":"stayed at gym 70 min"},
+            {"commitment_id":999,"outcome":"done","evidence":"unknown id"}]}"""
+        service.tick(at("2026-10-06", "20:00"))
+        assertEquals("done", store.commitmentOutcome(cid, "2026-10-06"))
+        assertTrue(store.recentDecisions(5).any { it.str("kind") == "agent_inferred_outcome" })
+    }
+
+    @Test fun dashboardKpisAndSourcesComeFromData() = runTest {
+        store.setProfile(Instant.now(), "goal_weight_kg", 76.0)
+        store.addMetric(Instant.now(), at("2026-10-01", "08:00"), "weight_kg", 80.0, "user_reported")
+        store.addMetric(Instant.now(), at("2026-10-06", "08:00"), "weight_kg", 79.0, "user_reported")
+        service.tick(at("2026-10-06", "10:00"))
+        val d = Dashboard.build(service, at("2026-10-06", "10:30"))
+        val kpi = d.kpis.toMap()
+        assertTrue(kpi["Goal progress"]!!.contains("target 76.0"))
+        assertEquals("0/7 days", kpi["Food logging, 7 days"])
+        assertEquals("no data", kpi["Steps, 7-day average"])
+        assertEquals("30 min ago", d.sources.toMap()["Background loop"])
+        assertEquals("never", d.sources.toMap()["Health Connect"])
     }
 }
 
@@ -248,16 +345,18 @@ class ScriptedLlm : LlmProvider {
     var reply = "Nice, logged."
     var fail = false
     var lastDecidePrompt = ""
+    var lastReplyPrompt = ""
+    var lastExtractRequest: LlmRequest? = null
     val calls = mutableMapOf<String, Int>()
 
     override suspend fun generate(request: LlmRequest): LlmResponse {
         calls[request.purpose] = (calls[request.purpose] ?: 0) + 1
         if (fail) throw LlmException("down")
         val text = when (request.purpose) {
-            "extract" -> extraction
+            "extract" -> { lastExtractRequest = request; extraction }
             "decide" -> { lastDecidePrompt = request.userText; decide }
             "reflect" -> reflect
-            else -> reply
+            else -> { lastReplyPrompt = request.userText; reply }
         }
         return LlmResponse(text, name, "scripted")
     }

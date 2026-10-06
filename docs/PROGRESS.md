@@ -2,7 +2,16 @@
 
 Newest first. One dated block per session: what changed, how it was verified, and what's next.
 
-## Current state (2026-10-07, v2.0)
+## Current state (2026-10-07, v2.1)
+- **v2.1:**
+  - **Voice calls:** the agent decides when to call. Calls use Gemini Live (`gemini-3.8-live`, with a fallback model).
+  - **Telegram photo and voice** are fixed.
+  - **Dashboard:** progress KPIs and data-source health.
+  - **Updates in Setup:** check now, status and errors.
+  - Removed the last fixed lists (off-plan keywords, meal clock times, gym heuristic).
+- **Tests:** 12 engine, 23 service and 6 Telegram unit tests, plus 4 live tests (agent, voice, Telegram send, Telegram photo+voice). All green.
+
+## Previous state (v2.0)
 - **v2 autonomous agent is implemented** (D-032…D-037, `docs/AGENT.md`, audit in `docs/AUDIT.md`):
   - the LLM decides act, timing, channel and message, and learns from outcomes;
   - memory tiers;
@@ -23,6 +32,22 @@ Newest first. One dated block per session: what changed, how it was verified, an
 3. Watch: near-repeated messages, timing quality, ColorOS killing the polling service.
 
 ## Log
+- **2026-10-07 (v2.1 voice calls, media, dashboard).**
+  - Changes: D-038…D-041 (see `CHANGELOG.md`, `AUDIT.md` B1–B5).
+  - Verified with the real product:
+    - **Telegram:** a real photo (a thali) and a real OGG voice note were sent through the bot to the user's chat. The bridge downloaded them and real Gemini described and transcribed them. Both were stored and replied to in Telegram (`build/live-telegram-media.txt`).
+    - **Voice test (`LiveVoiceTest`):** Gemini Live coach plus a Gemini Live simulated user talking by audio, 5–7 turns of Hinglish. The coach ended the call itself with `end_call`. The transcript became a skip for the commitment, a new morning-walk commitment and a long-term memory. The next agent decision used the call ("check in before their morning walk").
+    - **Emulator, real key:**
+      1. The user typed "call kar lo…" in chat.
+      2. On its own, the agent chose `channel: call`.
+      3. The phone rang with a CallStyle notification (Decline/Answer).
+      4. Answer opened a live call on `gemini-3.8-live`, and the coach spoke first in Hinglish about the user's situation.
+      5. End: the call was stored, and the agent re-evaluated ("follow up on the silent call").
+    - **📞 user-started call:** also verified on the emulator.
+  - Found and fixed during verification:
+    - The reply prompt said the coach "can't call". It now knows calls exist.
+    - Live tests at night hit quiet hours; they now move quiet hours away from now.
+    - Mic init failure is now shown on the call screen instead of crashing.
 - **2026-10-07 (v2.0 autonomous agent).**
   - Changes:
     - Audited v1.1 honestly: rules plus LLM wording, fixed windows, template fallbacks, scripted buttons.

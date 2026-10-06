@@ -21,10 +21,6 @@ import kotlin.math.sqrt
  */
 object Patterns {
     const val LOOKBACK_DAYS = 56L
-    val OFFPLAN_KEYS = setOf(
-        "samosa", "kachori", "pakora", "vada_pav", "pav_bhaji", "sev", "namkeen", "instant_noodles", "gulab_jamun",
-        "jalebi", "ladoo", "pizza", "burger", "french_fries", "soft_drink", "street_snack", "chowmein", "beer",
-    )
     const val MIN_LIFT = 0.25
     const val MIN_SUPPORT = 3
     const val MIN_WEEKS = 2
@@ -97,7 +93,7 @@ object Patterns {
         }
         val offplan = HashMap<String, MutableList<Row>>()
         store.foodBetween(since, TimeUtil.daysAgo(today, 1)).forEach { f ->
-            if (f.str("food_key") in OFFPLAN_KEYS || (f.str("meal_slot") == "snack" && f.str("nutrition_source") == "llm_estimate")) {
+            if (f.long("off_plan") == 1L) { // judged by the LLM against this user's goal, not a fixed food list
                 offplan.getOrPut(f.str("local_date")!!) { mutableListOf() } += f
             }
         }

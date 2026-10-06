@@ -27,7 +27,7 @@ class Db(context: Context?, name: String? = "coach.db") :
     }
 
     companion object {
-        const val SCHEMA_VERSION = 2
+        const val SCHEMA_VERSION = 3
 
         val MIGRATIONS = listOf(
             // v2: agent loop, channels, memory tiers, intervention outcomes.
@@ -44,6 +44,12 @@ class Db(context: Context?, name: String? = "coach.db") :
                 "CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL)",
                 """CREATE TABLE observations (id INTEGER PRIMARY KEY, observed_at TEXT NOT NULL, kind TEXT NOT NULL,
                     summary TEXT NOT NULL, significant INTEGER NOT NULL DEFAULT 1)""",
+            ),
+            // v3: off-plan judged per user by the LLM; voice calls.
+            listOf(
+                "ALTER TABLE food_events ADD COLUMN off_plan INTEGER NOT NULL DEFAULT 0",
+                """CREATE TABLE calls (id INTEGER PRIMARY KEY, intervention_id INTEGER, status TEXT NOT NULL, purpose TEXT,
+                    rang_at TEXT NOT NULL, answered_at TEXT, ended_at TEXT, model TEXT, summary TEXT, transcript_json TEXT)""",
             ),
         )
 

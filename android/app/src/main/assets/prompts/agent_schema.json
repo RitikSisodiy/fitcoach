@@ -1,16 +1,84 @@
 {
  "type": "object",
  "properties": {
-  "act": {"type": "boolean", "description": "true = send a message now"},
-  "reason": {"type": "string", "description": "one or two sentences: why act now, or why silence"},
-  "intent": {"type": "string", "description": "short snake_case label of what this message is for, e.g. commitment_walk, meal_check, plan_ahead, reengage, weekly_reflection, ask_missing_info"},
-  "commitment_id": {"type": "integer", "description": "id of the commitment this message is about, if any"},
-  "message": {"type": "string"},
-  "quick_replies": {"type": "array", "items": {"type": "string"}},
-  "channel": {"type": "string", "enum": ["notification", "telegram"]},
-  "expected_outcome": {"type": "string"},
-  "next_check_minutes": {"type": "integer", "description": "when to look again, 15 to 720"},
-  "next_check_reason": {"type": "string", "description": "what you will be looking for then"}
+  "act": {
+   "type": "boolean",
+   "description": "true = send a message now"
+  },
+  "reason": {
+   "type": "string",
+   "description": "one or two sentences: why act now, or why silence"
+  },
+  "intent": {
+   "type": "string",
+   "description": "short snake_case label of what this message is for, e.g. commitment_walk, meal_check, plan_ahead, reengage, weekly_reflection, ask_missing_info"
+  },
+  "commitment_id": {
+   "type": "integer",
+   "description": "id of the commitment this message is about, if any"
+  },
+  "message": {
+   "type": "string",
+   "description": "what to say; for a call: why you are calling, in one short sentence (shown on the incoming-call screen and used to open the call)"
+  },
+  "quick_replies": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "channel": {
+   "type": "string",
+   "enum": [
+    "notification",
+    "telegram",
+    "call"
+   ]
+  },
+  "expected_outcome": {
+   "type": "string"
+  },
+  "next_check_minutes": {
+   "type": "integer",
+   "description": "when to look again, 15 to 720"
+  },
+  "next_check_reason": {
+   "type": "string",
+   "description": "what you will be looking for then"
+  },
+  "commitment_outcomes": {
+   "type": "array",
+   "description": "Only when new_observations clearly show that a commitment was done or skipped (with the evidence).",
+   "items": {
+    "type": "object",
+    "properties": {
+     "commitment_id": {
+      "type": "integer"
+     },
+     "outcome": {
+      "type": "string",
+      "enum": [
+       "done",
+       "smaller",
+       "skipped"
+      ]
+     },
+     "evidence": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "commitment_id",
+     "outcome",
+     "evidence"
+    ]
+   }
+  }
  },
- "required": ["act", "reason", "next_check_minutes", "next_check_reason"]
+ "required": [
+  "act",
+  "reason",
+  "next_check_minutes",
+  "next_check_reason"
+ ]
 }

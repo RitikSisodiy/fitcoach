@@ -269,3 +269,24 @@ Memory items must be grounded in the user's words, like food items. Every reply 
 - **Outcome tracking:** each proactive message gets an outcome: answered (with minutes to reply), ignored (no reply within 3 h), achieved or not_achieved (for commitment messages, from the day's commitment log).
 - **Statistics:** code computes response rates by 3-hour block and by channel, plus slot-learner estimates for commitments.
 - **Reflection:** a daily LLM step rewrites up to 8 coach insights with evidence. Decisions and replies are told to follow them.
+
+### D-038 — Voice calls: Gemini Live, one more channel of the same agent
+**Decision.**
+- **Channel:** the agent may choose `channel: "call"` when `limits.can_call_now` is true. Code only enforces the limits: the user allows calls, microphone and notifications are granted, at most one agent call a day, plus all the usual send limits.
+- **Ringing:** the phone rings with an Android `CallStyle` incoming-call notification and a full-screen intent (Android 14+ needs the user's "full-screen" access, otherwise it is a heads-up). It times out after 45 s. Declined and missed (3 min) calls become significant observations, so the agent decides any follow-up.
+- **The call:** `VoiceCallService` (microphone foreground service) streams 16 kHz PCM to a Gemini Live WebSocket session (`voice/LiveSession.kt`) and plays the 24 kHz audio back. The coach sees `call_system.txt`: the reason it called, plus the same context and memory as chat. It ends the call itself with the `end_call` tool and a summary. Both sides are transcribed live on screen.
+- **Afterwards:** `CoachService.ingestCall` stores the turns as messages (channel `call`) and extracts from the whole transcript, grounded in the user's words. It marks the coach's call answered and leaves a `call_ended` observation, so the next agent decision sees what was said.
+- **Models:** `gemini-3.8-live` first, for lowest latency. If it refuses the setup, or its first turn has a transcript but no audio (a reported issue), the session switches to `gemini-3.1-flash-live-preview`. The extended-thinking variant was not chosen: latency matters more on a call, and the reasoning about *whether* to call happens before the call, in the agent.
+- **Not a wrapper:** this is not STT + LLM + TTS. Live is native audio, with its own voice activity detection and barge-in (`interrupted` flushes playback).
+
+### D-039 — Media understood once, then treated as text
+**Decision.** The multimodal extraction call also returns `media_summary` (a voice transcript, or what a photo shows). It is stored as the message content (`[photo] …`) and given to the reply LLM, so the reply, memory and later retrieval work on the content without sending the media twice. Media calls get a 60 s timeout, because Flash with an image is slower than 20 s. Telegram media failures are told to the user instead of being swallowed by the poll loop.
+
+### D-040 — Remove the remaining fixed lists
+**Decision.**
+- **Off-plan food:** judged by the LLM against the user's goal (`off_plan`), not by a keyword list.
+- **Meal time:** the time the user said (`eaten_at`), else the user's own median time for that slot over 30 days, else now. There is no fixed clock per slot.
+- **Leaving a place:** recorded as an observation. The agent settles commitments from evidence through `commitment_outcomes`, replacing the gym keyword heuristic.
+
+### D-041 — Update status is visible
+**Decision.** Setup shows the installed and latest versions, the last check time and any error (GitHub rate limit, network, install failure with its reason), plus "Check now", "Update to X" and the release notes. A failed check is never silent.

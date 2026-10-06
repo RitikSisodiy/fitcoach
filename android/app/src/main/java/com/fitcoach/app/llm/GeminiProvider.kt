@@ -92,7 +92,9 @@ class GeminiProvider(
         repeat(candidates.size + 2) {
             val model = pick(candidates) ?: return@repeat
             val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent"
-            val result = withTimeoutOrNull(CALL_TIMEOUT_MS) { transport.post(url, apiKey, body(model).toString(), CALL_TIMEOUT_MS.toInt()) }
+            // Photos and voice notes take longer to process than text.
+            val timeout = if (request.media.isEmpty()) CALL_TIMEOUT_MS else MEDIA_TIMEOUT_MS
+            val result = withTimeoutOrNull(timeout) { transport.post(url, apiKey, body(model).toString(), timeout.toInt()) }
             val b = budgets.getValue(model)
             if (result == null) {
                 errors += "$model: timeout"; b.blockedUntil = System.currentTimeMillis() + SLOW_COOLDOWN_MS; return@repeat
@@ -190,6 +192,7 @@ class GeminiProvider(
     companion object {
         val QUOTA_ZONE: ZoneId = ZoneId.of("America/Los_Angeles") // quotas reset at midnight Pacific
         const val CALL_TIMEOUT_MS = 20_000L
+        const val MEDIA_TIMEOUT_MS = 60_000L
         const val SLOW_COOLDOWN_MS = 300_000L
         const val MAX_WAIT_MS = 20_000L
         val FAST_PURPOSES = setOf("decide", "nudge", "generic", "extract", "reply")

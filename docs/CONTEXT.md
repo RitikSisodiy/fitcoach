@@ -8,7 +8,7 @@ A personal, proactive AI fitness coach for one lazy user (Hinglish, India).
 - It reminds the user of their own rules at the right moment, offers smaller versions instead of all-or-nothing, and never shames.
 - **Product (v2):** a native Android app. No server.
   - The phone is the backend for the app chat, notifications and the user's own Telegram bot.
-  - An LLM agent decides whether, when and how to reach the user, remembers what they say, and learns from outcomes.
+  - An LLM agent decides whether, when and how to reach the user (notification, Telegram or a voice call), remembers what they say, and learns from outcomes.
   - Gemini is called with the user's own key. See `docs/AGENT.md`.
 
 ## Layout
@@ -17,6 +17,7 @@ A personal, proactive AI fitness coach for one lazy user (Hinglish, India).
 | `android/` | Kotlin + Compose app (the product) |
 | `android/app/src/main/java/com/fitcoach/app/engine/` | Engine: `CoachService` (pipeline, tick, limits, outcomes, memory), `Agent` (situation → LLM decision, reflection), `Dashboard`, `Policy` (facts, caps, slot learner), `Engagement`, `Patterns`, `Analytics`, `Extraction` (validator), `LlmTasks` (prompts, extractor, coach reply), `Nutrition`, `Safety`, `NotificationParser` |
 | `android/app/src/main/assets/prompts/` | All prompts and JSON schemas |
+| `.../voice/` | Voice calls: Gemini Live session (WebSocket), call audio, ringing notification, call service and screen |
 | `.../telegram/` | Bot API client, bridge (pairing, updates, quick replies), polling service, channel delivery |
 | `.../data/` | `Db` (schema), `Store` (all SQL) |
 | `.../llm/` | `GeminiProvider` (free-tier routing, quota pacing) |
@@ -47,7 +48,7 @@ A personal, proactive AI fitness coach for one lazy user (Hinglish, India).
     - `fitcoach-release-check.sh`
     - `fitcoach-update-check.sh install|update [fresh]` (in-app update test against real releases)
     - `fitcoach-signing-setup.sh` (release key; secrets in GitHub; backup in `~/.fitcoach-signing/`)
-    - `fitcoach-live-tests.sh` (unit tests plus live Gemini/Telegram, keys from `.env`)
+    - `fitcoach-live-tests.sh [--rerun --tests '*X*']` (unit tests plus live Gemini/Telegram, keys from `.env`). Live media test inputs: `TEST_PHOTO`, `TEST_VOICE` (in `~/projects/fitcoach-media/`; ffmpeg in `~/projects/.mediavenv`)
     - `fitcoach-v2-e2e.sh setup|shot|tap|db|logs`: emulator with the real key and the Telegram bot paired to the user's chat via prefs. Night-time testing needs the emulator timezone moved or quiet hours changed.
   - Sync cloud → laptop: tar the changed files, deliver them with SendUserFile, then commit them to `~/projects/` and extract. For small edits, apply the same patch on both sides and compare `md5sum`.
 - **Phone:** OnePlus / Oppo / Realme / Vivo (ColorOS). Aggressive background killing is the main runtime risk.

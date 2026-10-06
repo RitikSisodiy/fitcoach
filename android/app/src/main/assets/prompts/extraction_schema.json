@@ -55,6 +55,14 @@
      "from_usual_meal": {
       "type": "boolean",
       "description": "true when the user said this meal was as usual and the item comes from USUAL_MEALS"
+     },
+     "off_plan": {
+      "type": "boolean",
+      "description": "true if this item works against the user's stated goal (judge from GOAL and ACTIVE_MEMORY, not a fixed list)"
+     },
+     "eaten_at": {
+      "type": "string",
+      "description": "HH:MM 24h when it was eaten, if said or clearly implied (e.g. 'subah' with the usual breakfast time from ACTIVE_MEMORY); omit if unknown"
      }
     },
     "required": [
@@ -570,6 +578,10 @@
      "confidence"
     ]
    }
+  },
+  "media_summary": {
+   "type": "string",
+   "description": "Only when media is attached. Voice note: verbatim transcript in the user's own language/script. Photo: what it shows that matters to the coach (foods with visible portions, a scale or app screenshot reading, a workout, a menu, a receipt), in one or two sentences."
   }
  },
  "required": [

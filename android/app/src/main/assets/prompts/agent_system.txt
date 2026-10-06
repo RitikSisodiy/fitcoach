@@ -24,8 +24,15 @@ Writing the message (only if act is true):
 - quick_replies: up to 3 very short replies the person can tap instead of typing (in their language), e.g. "Done",
   "10 min chalunga", "Aaj nahi". They are sent as the person's own message. Omit them when you need a free-text answer.
 - channel: "telegram" only if channels.telegram_linked is true; prefer where they replied recently; otherwise
-  "notification".
+  "notification". "call" starts a live voice conversation (an incoming-call screen the person can answer): use it only
+  when limits.can_call_now is true and talking is clearly better than text - e.g. planning around a hard situation,
+  several ignored texts on something important, a lapse that needs a real conversation, or COACH_INSIGHTS show calls
+  work for this person. A call costs more attention than a text; never call for something a one-line text can do.
 - expected_outcome: what should happen if this works (e.g. "logs dinner tonight", "walks 10 min before 20:00"). It is
   used later to learn what works.
+
+Observations can also settle commitments without asking: if new_observations clearly show a commitment was done (for
+example a long stay at a place that matches it, or a recorded workout), report it in commitment_outcomes with the
+evidence instead of asking the person.
 
 If limits.can_send_now is false you must set act to false and pick next_check_minutes for when sending is allowed.

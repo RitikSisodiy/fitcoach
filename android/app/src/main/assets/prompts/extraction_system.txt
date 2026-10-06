@@ -17,8 +17,8 @@ Rules:
   reason_category: cannot (genuinely unable), forgot, dont_want, too_hard, bad_timing, unknown.
 - memories: anything worth remembering beyond this message, so the user never has to repeat it.
   long_term = durable (work setup, routines, schedule, food preferences, dislikes, constraints, injuries, family, motivations).
-  temporary = true only for a while (travelling till Sunday, knee pain, exams this week, guests at home, fever, festival week):
-  set valid_days. Reuse a key from ACTIVE_MEMORY to update or replace that memory. Skip trivial remarks and things already
+  temporary = true only for a while (travelling till Sunday, knee pain, exams this week, guests at home, fever, festival week,
+  a one-off plan or agreement for a specific day/time such as "walk tomorrow 7 am"): set valid_days to cover it. Reuse a key from ACTIVE_MEMORY to update or replace that memory. Skip trivial remarks and things already
   captured as food/activity/commitments/goals.
 - lapse.detected when the user reports going off-plan; all_or_nothing_thinking when they say the day/week is ruined or
   they will "start again Monday".
@@ -29,6 +29,11 @@ Rules:
   normally eat ("lunch me mostly 3 roti dal sabzi hota hai") - this is NOT a food log for today unless they also say they ate it.
 - pattern_feedback: when the user says a KNOWN_PATTERNS claim is wrong/right.
 - data_needed: when the user asks about the past ("kal kitna khaya", "is hafte walk kitni hui", "weight trend?").
+- Media: when a photo or voice note is attached, ALWAYS fill media_summary (voice: verbatim transcript; photo: what it
+  shows that matters). Then extract from it exactly as if the user had typed it: a food photo -> food_items with visible
+  portions and wider kcal ranges; a scale/app screenshot -> body_metrics or activities; spoken plans -> commitments etc.
+- off_plan: judge each food against THIS user's goal and memory; there is no fixed list of "bad" foods.
+- eaten_at: only if the time is said or clearly implied.
 - Meal slot: infer from words (nashta=breakfast, lunch, dinner/raat ka khana) or the local time if eaten "abhi".
 - coaching_mode_request / pause_days only when the user explicitly asks to change coaching intensity or pause the coach.
 - "as usual" / "same as always" for a meal: if USUAL_MEALS has that slot, add those items to food_items with

@@ -125,18 +125,20 @@ class TelegramBridge(private val api: TelegramApi, private val settings: Telegra
         if (chatId != paired) return "ignored: other chat"
         if (text.startsWith("/start")) return "ignored: start"
         api.typing(chatId)
-        val media = mutableListOf<MediaPart>()
-        var kind = "text"
-        msg.optJSONObject("voice")?.let { media += MediaPart(api.downloadFile(it.getString("file_id")), it.optString("mime_type", "audio/ogg")); kind = "voice" }
-        msg.optJSONArray("photo")?.let { sizes ->
-            val best = sizes.getJSONObject(sizes.length() - 1)
-            media += MediaPart(api.downloadFile(best.getString("file_id")), "image/jpeg"); kind = "photo"
+        // Photos, image files, voice notes and audio files all go to the same multimodal pipeline as the app chat.
+        val (kind, file) = mediaOf(msg) ?: ("text" to null)
+        if (text.isBlank() && file == null) return "ignored: unsupported message"
+        return try {
+            val media = file?.let { listOf(MediaPart(api.downloadFile(it.first), it.second)) } ?: emptyList()
+            val replies = service().handleMessage(Inbound(text, Instant.ofEpochSecond(msg.optLong("date")).coerceAtMost(Instant.now()), kind, media,
+                externalId = "tg:${update.optLong("update_id")}", channel = "telegram"))
+            replies.forEach { deliver(it) }
+            "handled $kind: ${replies.size} replies"
+        } catch (e: Exception) {
+            // Infrastructure failure (download, network): tell the user instead of going silent.
+            runCatching { api.sendMessage(chatId, "(I couldn't process that $kind: ${e.message ?: e.javaClass.simpleName}. Please try again.)") }
+            "error: ${e.message}"
         }
-        if (text.isBlank() && media.isEmpty()) return "ignored: unsupported message"
-        val replies = service().handleMessage(Inbound(text, Instant.ofEpochSecond(msg.optLong("date")).coerceAtMost(Instant.now()), kind, media,
-            externalId = "tg:${update.optLong("update_id")}", channel = "telegram"))
-        replies.forEach { deliver(it) }
-        return "handled: ${replies.size} replies"
     }
 
     private suspend fun handleCallback(cb: JSONObject, updateId: Long): String {
@@ -159,6 +161,24 @@ class TelegramBridge(private val api: TelegramApi, private val settings: Telegra
     }
 
     companion object {
+        /** (kind, (file_id, mime)) for the media in a Telegram message, if any. */
+        fun mediaOf(msg: JSONObject): Pair<String, Pair<String, String>>? {
+            msg.optJSONObject("voice")?.let { return "voice" to (it.getString("file_id") to it.optString("mime_type", "audio/ogg")) }
+            msg.optJSONObject("audio")?.let { return "voice" to (it.getString("file_id") to it.optString("mime_type", "audio/mpeg")) }
+            msg.optJSONArray("photo")?.let { sizes ->
+                // Largest size within ~1.5 MP keeps the request small; Telegram lists sizes ascending.
+                val all = (0 until sizes.length()).map { sizes.getJSONObject(it) }
+                val best = all.lastOrNull { it.optInt("width") * it.optInt("height") <= 1_600_000 } ?: all.first()
+                return "photo" to (best.getString("file_id") to "image/jpeg")
+            }
+            msg.optJSONObject("document")?.let { d ->
+                val mime = d.optString("mime_type")
+                if (mime.startsWith("image/")) return "photo" to (d.getString("file_id") to mime)
+                if (mime.startsWith("audio/")) return "voice" to (d.getString("file_id") to mime)
+            }
+            return null
+        }
+
         /** "qr:<message row id>:<index>" -> the quick reply text stored with that message. */
         fun quickReplyLabel(store: Store, data: String): String? {
             val p = data.split(":")

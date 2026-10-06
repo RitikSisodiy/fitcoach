@@ -4,6 +4,8 @@ Priority: P0 (blocks real use) · P1 (high value) · P2 (later). Status: TODO ·
 
 ## DONE
 
+- [x] v2.1: voice calls (Gemini Live), Telegram photo/voice fix, dashboard KPIs and source health, update status UI, generic re-audit (D-038…D-041)
+
 - [x] v2 autonomous agent: audit, agent loop, memory tiers, outcome learning, Telegram, dashboard (D-032…D-037)
 
 - [x] v1.0 Android app (D-027…D-030): engine port, on-device sensors, in-app chat, notifications with buttons, Setup checklist for ColorOS
@@ -45,6 +47,10 @@ Priority: P0 (blocks real use) · P1 (high value) · P2 (later). Status: TODO ·
 - Release build with R8 (3.4 MB APK): done 2026-10-06.
 
 ## TODO
+
+- [ ] **P0** On the real phone: allow "full-screen calls" (Setup) and take one real coach call. Check the earpiece/speaker audio and the echo cancellation on ColorOS.
+- [ ] **P1** Only one device can poll the Telegram bot: the emulator got 409 Conflict while the phone was polling. Fine in real use; tests must stop the phone's polling or use another bot.
+- [ ] **P2** Live session resumption (`goAway`) for calls longer than about 10 min. Calls are short today.
 
 - [ ] **P0** The user runs v2 for a real week (app + Telegram). Review the dashboard decision log and the coach insights. Tune `agent_system.txt` from real misses.
 - [x] Quiet hours setting (Setup → Coaching style).

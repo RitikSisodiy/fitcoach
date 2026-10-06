@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.1.0 — 2026-10-07 (voice calls, media, real dashboard)
+
+### Added
+- **Coach calls:** the agent can decide to call. Android shows "Coach wants to talk" with a ringtone (full screen where allowed). Answering starts a live Gemini voice conversation with on-screen transcripts of both sides, mute, speaker and end. The coach ends the call when the conversation is done. The transcript becomes memory, and the agent decides any follow-up. You can also call the coach yourself from Chat (📞).
+- **Dashboard:**
+  - progress: goal progress, adherence for 7 and 14 days, logging coverage, average kcal and protein, steps compared with the previous week, message answer and action rates, agent activity;
+  - voice calls;
+  - data-source freshness and access status.
+- **Updates in Setup:** installed and latest versions, check now, update, release notes, and visible errors.
+
+### Fixed
+- Photos sent on Telegram got no reply. The image is now described by the multimodal model, answered, and stored. Voice notes are transcribed the same way.
+
+### Changed
+- Off-plan food, meal times and gym check-outs are no longer decided by fixed lists or times (see `AUDIT.md`, B1–B3).
+
 ## 2.0.0 — 2026-10-07 (autonomous agent)
 
 ### Added

@@ -523,6 +523,6 @@ class Store(val db: SQLiteDatabase, val tz: ZoneId) {
             .put("quiet_start", "22:30").put("quiet_end", "07:30").put("paused_until", JSONObject.NULL)
             .put("height_cm", JSONObject.NULL).put("goal_weight_kg", JSONObject.NULL).put("kcal_target", JSONObject.NULL)
             .put("protein_target_g", JSONObject.NULL).put("never_do", JSONArray()).put("goal_text", JSONObject.NULL)
-            .put("usual_meals", JSONObject())
+            .put("usual_meals", JSONObject()).put("calls_allowed", true)
     }
 }

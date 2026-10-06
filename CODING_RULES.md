@@ -71,3 +71,8 @@ Update it when you learn something reusable (add it under "Lessons"). Keep it sh
 - Throttles must not block the user-facing path. The updater shared one 6-hour throttle with app open and missed a release it had just published. Test update flows with two real releases.
 - Release signing must never change, or in-place updates fail. Keep the keystore backup (`~/.fitcoach-signing/` on the laptop) safe.
 - After editing the same file in both places (cloud copy and laptop copy), compare checksums (`md5sum`) so the two never drift.
+- Failures in background loops (Telegram polling, workers) must reach the user or the log, never be swallowed silently. A swallowed exception looked like "the bot ignores photos".
+- When a multimodal call understands media, keep its text form (`media_summary`) so later steps never need the media again.
+- Real-time voice can be tested without a human: two Gemini Live sessions, one role-playing the user, piping audio to each other (24 kHz out, resampled to 16 kHz in, streamed in real time with silence between turns).
+- Live tests that call `tick()` run at any hour. Move quiet hours away from now inside the test, or the agent never runs.
+- OkHttp 4 from Kotlin: use the extension APIs (`toMediaType()`, `asRequestBody()`, `response.body`). The Java-style statics are errors.

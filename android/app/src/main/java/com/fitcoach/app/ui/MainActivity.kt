@@ -101,7 +101,7 @@ private fun UpdateBanner() {
     val rel = release ?: return
     Card(Modifier.fillMaxWidth().padding(8.dp)) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(status.ifEmpty { "FitCoach ${rel.version} is available" }, Modifier.weight(1f))
+            Text(status.ifEmpty { "Update available: ${rel.version} (you have ${Updater.currentVersion(ctx)})" }, Modifier.weight(1f))
             Button(enabled = status.isEmpty() || status.startsWith("Failed"), onClick = {
                 if (!Updater.ensureInstallAllowed(ctx)) { status = ""; return@Button }
                 scope.launch {

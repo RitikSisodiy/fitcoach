@@ -17,6 +17,7 @@ class Prompts(read: (String) -> String) {
     val agentSchema = JSONObject(read("agent_schema.json"))
     val reflectSystem = read("reflect_system.txt")
     val reflectSchema = JSONObject(read("reflect_schema.json"))
+    val callSystem = read("call_system.txt")
 
     companion object {
         fun fromAssets(assets: android.content.res.AssetManager) = Prompts { name -> assets.open("prompts/$name").bufferedReader().use { it.readText() } }
@@ -29,9 +30,11 @@ class Extractor(private val llm: LlmProvider, private val prompts: Prompts, priv
 
     private fun aliases(name: String): List<String> = foods?.aliasesFor(name) ?: emptyList()
 
-    suspend fun extract(text: String, media: List<MediaPart>, context: JSONObject, activeIds: Set<Long>, usualFoods: Set<String>): Pair<Extraction, JSONObject> {
+    /** [promptText] replaces the message shown to the LLM (e.g. a call transcript); grounding still uses [text]. */
+    suspend fun extract(text: String, media: List<MediaPart>, context: JSONObject, activeIds: Set<Long>, usualFoods: Set<String>,
+                        promptText: String? = null): Pair<Extraction, JSONObject> {
         val prompt = context.keys().asSequence().joinToString("\n") { k -> "$k: ${context.get(k)}" } +
-            "\n\nUSER_MESSAGE: ${text.ifBlank { "(see attached media)" }}"
+            "\n\nUSER_MESSAGE: ${promptText ?: text.ifBlank { "(see attached media)" }}"
         val raw = llm.generate(
             LlmRequest(prompts.extractionSystem, prompt, media = media, jsonSchema = prompts.extractionSchema, temperature = 0.0, purpose = "extract"),
         ).json()

@@ -46,6 +46,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.fitcoach.app.FitCoachApp
+import com.fitcoach.app.voice.CallActivity
 import com.fitcoach.app.core.TimeUtil
 import com.fitcoach.app.data.long
 import com.fitcoach.app.data.str
@@ -125,6 +126,7 @@ fun ChatScreen(app: FitCoachApp) {
             if (busy) item { Text("Coach is thinking…", Modifier.padding(8.dp), style = MaterialTheme.typography.labelMedium) }
         }
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = { ctx.startActivity(CallActivity.userCall(ctx)) }) { Text("📞") }
             TextButton(onClick = { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) { Text("📷") }
             TextButton(onClick = {
                 val r = recorder
@@ -160,7 +162,7 @@ private fun Bubble(m: ChatItem, onReply: (String) -> Unit) {
                 .padding(10.dp),
         ) {
             Text(m.text, style = MaterialTheme.typography.bodyMedium)
-            Text(m.time + if (m.channel == "telegram") " · Telegram" else if (m.channel == "notification") " · notification" else "",
+            Text(m.time + when (m.channel) { "telegram" -> " · Telegram"; "notification" -> " · notification"; "call" -> " · call"; else -> "" },
                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (m.quickReplies.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 m.quickReplies.forEach { label -> AssistChip(onClick = { onReply(label) }, label = { Text(label) }) }
