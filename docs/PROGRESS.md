@@ -2,25 +2,37 @@
 
 Newest first. One dated block per session: what changed, how it was verified, and what's next.
 
-## Current state (2026-10-06)
-- **Repo:** github.com/RitikSisodiy/fitcoach (public).
-  - Every push to master that changes `android/**` → CI tests, builds, signs and publishes GitHub Release `v1.1.N`.
-  - Latest: see the Releases page.
-- **In-app updates** were verified on the emulator against real GitHub releases (1.1.2 → 1.1.3 → 1.1.4): banner, download, system confirm, installed.
-- **Not yet installed on the user's phone.** The 1.0.0 APK sent earlier was signed with the debug key, so uninstall it once and install the latest GitHub release. From then on the app updates itself.
-- **Tests:** 11 engine + 9 service + 1 live Gemini test, all green.
-- **Emulator:**
-  - Real-key chat works.
-  - The worker sent the evening recap on its own.
-  - The release build shows no crashes.
-- **Python Telegram bot:** retired and not running (the laptop rebooted; there is no need to restart it).
+## Current state (2026-10-07, v2.0)
+- **v2 autonomous agent is implemented** (D-032…D-037, `docs/AGENT.md`, audit in `docs/AUDIT.md`):
+  - the LLM decides act, timing, channel and message, and learns from outcomes;
+  - memory tiers;
+  - Telegram on the phone;
+  - the dashboard.
+- **Tests:** 12 engine, 16 service and 3 Telegram tests, plus 2 live tests (real Gemini 3-day agent run, real Telegram send). All green.
+- **Real end-to-end (emulator, real Gemini, real Telegram bot):**
+  1. The agent stayed silent at midnight and gave its reason.
+  2. In the morning, on its own, it sent a question with quick replies to the user's Telegram.
+  3. The user tapped "Weight loss" in Telegram.
+  4. The goal was saved to the profile, the coach replied in Telegram, and the intervention was marked answered after 3 min.
+  5. Both the app chat and the dashboard show the same conversation.
+- **Release:** CI publishes v2.0.N on push. A user on 1.1.x gets it as an in-app update.
 
 ## Next
-1. The user installs the latest GitHub release APK and completes the Setup checklist (`docs/ANDROID.md`).
-2. Run one real week and review the Today-tab decision log.
-3. Fix whatever breaks: ColorOS killing the worker, the bank SMS formats, geofence reliability.
+1. The user updates to v2.0.x, pairs Telegram in Setup and grants the permissions. Then a real week.
+2. Review the dashboard decision log and coach insights, and tune `assets/prompts/agent_system.txt` from real misses.
+3. Watch: near-repeated messages, timing quality, ColorOS killing the polling service.
 
 ## Log
+- **2026-10-07 (v2.0 autonomous agent).**
+  - Changes:
+    - Audited v1.1 honestly: rules plus LLM wording, fixed windows, template fallbacks, scripted buttons.
+    - Replaced Brain with the Agent loop.
+    - Added memory tiers, outcome evaluation and daily reflection.
+    - Telegram long-polling on the phone; quick replies across all channels.
+    - Dashboard; quiet-hours setting; Python archived; prompts in assets.
+  - Verified:
+    - `LiveAgentTest` transcript reviewed. The agent chose silence for work hours, timed messages after office, noticed ignored messages and backed off. Reflection wrote an evidence-backed insight. The reply recalled the goal and the temporary knee pain.
+    - Emulator end-to-end with the real Telegram user.
 - **2026-10-06 (git + CI + in-app updates).**
   - Changes:
     - Created the public repo.
