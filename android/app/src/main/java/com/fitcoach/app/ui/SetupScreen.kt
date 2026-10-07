@@ -15,6 +15,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -108,18 +112,22 @@ fun SetupScreen(app: FitCoachApp) {
     val bgLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { bump(); Places.registerAll(ctx, app.store) }
     val hcPerms = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) { bump(); Scheduler.runNow(ctx) }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Section("1. Gemini API key") {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        ScreenHeader("Settings", subtitle = "Your coach, your data", inset = 4.dp)
+        Section("Gemini API key") {
             Text("Free key from aistudio.google.com. Stored only on this phone.", style = MaterialTheme.typography.bodySmall)
-            OutlinedTextField(key, { key = it }, Modifier.fillMaxWidth(), label = { Text("API key") }, singleLine = true,
-                visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
-            Button(onClick = { app.apiKey = key; bump() }) { Text(if (app.apiKey == null) "Save" else "Update") }
+            FcTextField(key, { key = it }, "API key", visual = PasswordVisualTransformation())
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                FcButton(if (app.apiKey == null) "Save" else "Update", onClick = { app.apiKey = key; bump() })
+                Spacer(Modifier.width(12.dp))
+                if (app.apiKey != null) Pill("Connected", Fc.Good)
+            }
         }
 
         UpdatesSection(app)
         TelegramSection(app)
 
-        Section("2. Let the coach see what the phone sees") {
+        Section("What the coach can see") {
             PermRow("Notifications (coach messages)", Notifier.canPost(ctx)) {
                 if (Build.VERSION.SDK_INT >= 33) perms.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
             }
@@ -157,7 +165,7 @@ fun SetupScreen(app: FitCoachApp) {
             TextButton(onClick = { bump() }) { Text("Refresh status") }
         }
 
-        Section("3. Keep the coach alive (OnePlus / Oppo / Realme / Vivo)") {
+        Section("Keep the coach running") {
             val pm = ctx.getSystemService(PowerManager::class.java)
             PermRow("Battery: don't optimise FitCoach", pm.isIgnoringBatteryOptimizations(ctx.packageName)) {
                 ctx.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${ctx.packageName}")))
@@ -174,7 +182,7 @@ fun SetupScreen(app: FitCoachApp) {
             }) { Text("Open app settings") }
         }
 
-        Section("4. Places") {
+        Section("Places") {
             Text("Stand at a place (gym, office, chess club, a chaat stall you visit) and save it. " +
                 "Arrivals are noticed automatically and tie into your rules and patterns.", style = MaterialTheme.typography.bodySmall)
             places.forEach { p ->
@@ -201,7 +209,7 @@ fun SetupScreen(app: FitCoachApp) {
             if (placeMsg.isNotEmpty()) Text(placeMsg, style = MaterialTheme.typography.bodySmall)
         }
 
-        Section("5. Coaching style") {
+        Section("Coaching style") {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 COACHING_MODES.filter { it != "strong" }.forEach { m ->
                     FilterChip(selected = mode == m, onClick = { scope.launch(Dispatchers.IO) { app.service().setMode(Instant.now(), m); bump() } }, label = { Text(m) })
@@ -232,19 +240,13 @@ fun SetupScreen(app: FitCoachApp) {
 
 @Composable
 private fun Section(title: String, content: @Composable () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            content()
-        }
-    }
+    FcCard(title = title) { content() }
 }
 
 @Composable
 private fun PermRow(label: String, ok: Boolean, onFix: () -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text((if (ok) "✅ " else "⬜ ") + label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        if (!ok) TextButton(onClick = onFix) { Text("Allow") }
+    ListRow(label, leading = if (ok) Fc.Good else Fc.TextFaint, onClick = if (ok) null else onFix) {
+        if (ok) Pill("On", Fc.Good) else Pill("Allow", Fc.Accent, onClick = onFix)
     }
 }
 

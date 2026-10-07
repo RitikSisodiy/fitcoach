@@ -7,6 +7,29 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import com.fitcoach.app.ui.Fc
+import com.fitcoach.app.ui.FcButton
+import com.fitcoach.app.ui.FcIcons
+import com.fitcoach.app.ui.RoundIconButton
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -114,51 +137,104 @@ class CallActivity : ComponentActivity() {
         val list = rememberLazyListState()
         LaunchedEffect(ui.turns.size, ui.turns.lastOrNull()?.text?.length) { if (ui.turns.isNotEmpty()) list.scrollToItem(ui.turns.size - 1) }
         var summary by remember { mutableStateOf<String?>(null) }
+        var liveSince by remember { mutableStateOf(0L) }
         LaunchedEffect(ui.phase) {
+            if (ui.phase == "live" && liveSince == 0L) liveSince = System.currentTimeMillis()
             if (ui.phase == "ended") summary = withContext(Dispatchers.IO) { FitCoachApp.instance.service().call(callId)?.str("summary") }
         }
-        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).safeDrawingPadding().padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("FitCoach", style = MaterialTheme.typography.headlineMedium)
+        val elapsed by produceState(0L, liveSince, ui.phase) {
+            while (liveSince > 0 && ui.phase in setOf("live", "ending")) { value = (System.currentTimeMillis() - liveSince) / 1000; delay(1000) }
+        }
+        val active = ui.phase in setOf("connecting", "live", "ending")
+        Column(
+            Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF16220F), Fc.Bg, Fc.Bg))).safeDrawingPadding()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Spacer(Modifier.height(if (ringing) 48.dp else 8.dp))
+            Avatar(pulsing = ringing || ui.phase == "live", diameter = if (ringing) 128.dp else 84.dp)
+            Spacer(Modifier.height(16.dp))
+            Text("FitCoach", style = MaterialTheme.typography.headlineMedium, color = Fc.Text)
             Text(when {
                 ringing -> "Coach wants to talk"
                 ui.phase == "connecting" -> "Connecting…"
-                ui.phase == "live" -> "On call" + (ui.model?.let { " · $it" } ?: "")
+                ui.phase == "live" -> "%d:%02d".format(elapsed / 60, elapsed % 60)
                 ui.phase == "ending" -> "Saying goodbye…"
                 ui.phase == "failed" -> "Call failed"
                 else -> "Call ended"
-            }, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(12.dp))
+            }, style = MaterialTheme.typography.titleMedium, color = if (ui.phase == "failed") Fc.Bad else Fc.Accent)
+            Spacer(Modifier.height(16.dp))
             if (ringing) {
-                purpose?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
+                purpose?.let {
+                    Text(it, Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Fc.Surface.copy(alpha = 0.8f)).padding(18.dp),
+                        style = MaterialTheme.typography.bodyLarge, color = Fc.Text, textAlign = TextAlign.Center)
+                }
                 Spacer(Modifier.weight(1f))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    Button(onClick = ::decline, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828))) { Text("Decline") }
-                    Button(onClick = ::answer, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))) { Text("Answer") }
+                Row(Modifier.fillMaxWidth().padding(bottom = 32.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    CallButton(FcIcons.PhoneDown, "Decline", Fc.Bad, ::decline)
+                    CallButton(FcIcons.Phone, "Answer", Fc.Good, ::answer)
                 }
                 return@Column
             }
-            LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list) {
+            LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(ui.turns) { t ->
-                    Column(Modifier.padding(vertical = 4.dp)) {
-                        Text(if (t.role == "user") "You" else "Coach", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
-                        Text(t.text, style = MaterialTheme.typography.bodyLarge)
+                    val mine = t.role == "user"
+                    Column(Modifier.fillMaxWidth(), horizontalAlignment = if (mine) Alignment.End else Alignment.Start) {
+                        Text(if (mine) "You" else "Coach", Modifier.padding(horizontal = 6.dp), style = MaterialTheme.typography.labelSmall,
+                            color = if (mine) Fc.Accent else Fc.Violet)
+                        Text(t.text, Modifier.widthIn(max = 300.dp).clip(RoundedCornerShape(18.dp))
+                            .background(if (mine) Fc.Accent.copy(alpha = 0.14f) else Fc.SurfaceHigh).padding(horizontal = 14.dp, vertical = 10.dp),
+                            style = MaterialTheme.typography.bodyLarge, color = Fc.Text)
                     }
                 }
             }
-            ui.note?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            summary?.let { Text("Saved: $it", style = MaterialTheme.typography.bodyMedium) }
+            ui.note?.let { Text(it, Modifier.padding(vertical = 8.dp), style = MaterialTheme.typography.bodyMedium, color = Fc.Bad, textAlign = TextAlign.Center) }
+            summary?.let {
+                Column(Modifier.fillMaxWidth().padding(vertical = 8.dp).clip(RoundedCornerShape(20.dp)).background(Fc.Surface).padding(16.dp)) {
+                    Text("SAVED TO MEMORY", style = MaterialTheme.typography.labelSmall, color = Fc.TextMuted)
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = Fc.Text)
+                }
+            }
             Spacer(Modifier.height(12.dp))
-            if (ui.phase in setOf("connecting", "live", "ending")) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    OutlinedButton(onClick = { VoiceCallService.send(this@CallActivity, VoiceCallService.ACTION_MUTE) }) { Text(if (ui.muted) "Unmute" else "Mute") }
-                    OutlinedButton(onClick = { VoiceCallService.send(this@CallActivity, VoiceCallService.ACTION_SPEAKER) }) { Text(if (ui.speaker) "Earpiece" else "Speaker") }
-                    Button(onClick = { VoiceCallService.send(this@CallActivity, VoiceCallService.ACTION_HANG_UP) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828))) { Text("End") }
+            if (active) {
+                Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    CallButton(if (ui.muted) FcIcons.MicOff else FcIcons.Mic, if (ui.muted) "Unmute" else "Mute",
+                        if (ui.muted) Fc.Text else Fc.SurfaceHigher, { VoiceCallService.send(this@CallActivity, VoiceCallService.ACTION_MUTE) },
+                        tint = if (ui.muted) Fc.Bg else Fc.Text, size = 64.dp)
+                    CallButton(FcIcons.PhoneDown, "End", Fc.Bad, { VoiceCallService.send(this@CallActivity, VoiceCallService.ACTION_HANG_UP) }, size = 64.dp)
+                    CallButton(FcIcons.Speaker, if (ui.speaker) "Earpiece" else "Speaker",
+                        if (ui.speaker) Fc.Text else Fc.SurfaceHigher, { VoiceCallService.send(this@CallActivity, VoiceCallService.ACTION_SPEAKER) },
+                        tint = if (ui.speaker) Fc.Bg else Fc.Text, size = 64.dp)
                 }
             } else {
-                Button(onClick = { CallManager.state.value = CallUi(); finish() }) { Text("Close") }
+                FcButton("Close", onClick = { CallManager.state.value = CallUi(); finish() }, modifier = Modifier.fillMaxWidth())
             }
+        }
+    }
+
+    @Composable
+    private fun Avatar(pulsing: Boolean, diameter: Dp) {
+        val t = rememberInfiniteTransition(label = "pulse")
+        val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(1600), RepeatMode.Restart), label = "p")
+        Box(Modifier.size(diameter * 1.6f), contentAlignment = Alignment.Center) {
+            if (pulsing) Canvas(Modifier.size(diameter * 1.6f)) {
+                val r0 = diameter.toPx() / 2
+                for (k in 0..1) {
+                    val f = (p + k * 0.5f) % 1f
+                    drawCircle(Fc.Accent.copy(alpha = 0.35f * (1 - f)), radius = r0 + r0 * 0.6f * f)
+                }
+            }
+            Box(Modifier.size(diameter).clip(CircleShape).background(Fc.AccentGlow), contentAlignment = Alignment.Center) {
+                Icon(FcIcons.Spark, null, Modifier.size(diameter * 0.42f), tint = Fc.OnAccent)
+            }
+        }
+    }
+
+    @Composable
+    private fun CallButton(icon: ImageVector, label: String, color: Color, onClick: () -> Unit, tint: Color = Fc.Text, size: Dp = 72.dp) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            RoundIconButton(icon, label, onClick, container = color, tint = tint, size = size)
+            Text(label, style = MaterialTheme.typography.labelMedium, color = Fc.TextMuted)
         }
     }
 

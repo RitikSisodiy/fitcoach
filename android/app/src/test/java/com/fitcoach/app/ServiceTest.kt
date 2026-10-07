@@ -331,8 +331,8 @@ class ServiceTest {
         assertTrue(kpi["Goal progress"]!!.contains("target 76.0"))
         assertEquals("0/7 days", kpi["Food logging, 7 days"])
         assertEquals("no data", kpi["Steps, 7-day average"])
-        assertEquals("30 min ago", d.sources.toMap()["Background loop"])
-        assertEquals("never", d.sources.toMap()["Health Connect"])
+        assertEquals("30 min ago", d.sources.associate { it.label to it.status }["Background loop"])
+        assertEquals("never", d.sources.associate { it.label to it.status }["Health Connect"])
     }
 }
 

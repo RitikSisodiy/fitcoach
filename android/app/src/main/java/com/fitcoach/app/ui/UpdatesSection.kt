@@ -43,19 +43,18 @@ fun UpdatesSection(app: FitCoachApp) {
     var progress by remember { mutableIntStateOf(-1) }
     key(version, refresh) {
         val st = Updater.status(ctx)
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("App updates", style = MaterialTheme.typography.titleMedium)
-                Text("Installed: ${st.current}")
-                Text("Latest: ${st.latest ?: "not checked yet"}" + if (st.checkedAt > 0) " (checked ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(st.checkedAt))})" else "")
-                Text(
-                    when {
-                        st.updateAvailable -> "Update available."
-                        st.latest != null -> "You're up to date."
-                        else -> "Tap Check to look for updates."
-                    },
-                    style = MaterialTheme.typography.labelLarge,
-                )
+        FcCard(title = "App updates") {
+            run {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    MetricTile("Installed", st.current, Modifier.weight(1f), color = Fc.TextMuted)
+                    MetricTile("Latest", st.latest ?: "–", Modifier.weight(1f), color = if (st.updateAvailable) Fc.Accent else Fc.Good,
+                        caption = if (st.checkedAt > 0) "checked " + DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(st.checkedAt)) else "not checked yet")
+                }
+                when {
+                    st.updateAvailable -> Pill("Update available", Fc.Accent)
+                    st.latest != null -> Pill("You're up to date", Fc.Good)
+                    else -> Text("Tap Check now to look for updates.", style = MaterialTheme.typography.bodySmall)
+                }
                 st.error?.let { Text("Last check problem: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
                 st.installError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
                 if (busy.isNotEmpty()) {

@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.2.0 — 2026-10-07 (modern UI)
+
+### Changed
+- **New design system** (`ui/Theme.kt`, `ui/Components.kt`, `ui/Icons.kt`):
+  - always-dark premium look with a lime accent;
+  - rounded cards, metric tiles, progress rings and bar charts;
+  - the app's own line icons (no icon library);
+  - an adaptive launcher icon.
+- **Coach (chat):**
+  - header with a one-tap call button;
+  - day dividers and asymmetric bubbles;
+  - a typing indicator, and your message shows at once;
+  - quick replies as pills;
+  - a pill-shaped composer (photo, voice note, send);
+  - starter suggestions on an empty chat.
+- **Today (dashboard):**
+  - calorie, protein and step rings;
+  - a goal card with progress and the weight trend;
+  - KPI tiles;
+  - step and food charts;
+  - habit strips;
+  - "What your coach knows";
+  - a collapsible activity timeline;
+  - data sources with freshness dots and access chips.
+- **Settings:** grouped cards, permission rows with On/Allow pills, and version tiles for updates.
+- **Call screen:** a pulsing avatar, a big Answer/Decline, a live timer, transcript bubbles and round call controls.
+
 ## 2.1.0 — 2026-10-07 (voice calls, media, real dashboard)
 
 ### Added

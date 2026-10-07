@@ -290,3 +290,10 @@ Memory items must be grounded in the user's words, like food items. Every reply 
 
 ### D-041 — Update status is visible
 **Decision.** Setup shows the installed and latest versions, the last check time and any error (GitHub rate limit, network, install failure with its reason), plus "Check now", "Update to X" and the release notes. A failed check is never silent.
+
+### D-042 — One design system, always dark
+**Decision.** Colours, type and shapes live in `ui/Theme.kt` (`Fc` tokens). Every screen uses the shared components in `ui/Components.kt` and the app's own vector icons in `ui/Icons.kt`. The app is always dark; the user chose a "dark premium" style.
+**Why:**
+- one place to change the look;
+- no `material-icons` dependency (it is not in the current Compose BOM);
+- the dashboard engine now exposes numbers (`DashboardData.Headline`, `Source.ageMinutes`), so the UI draws rings and status dots from data instead of parsing text.

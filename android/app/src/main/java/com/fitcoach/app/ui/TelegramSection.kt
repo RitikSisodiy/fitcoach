@@ -42,9 +42,9 @@ fun TelegramSection(app: FitCoachApp) {
     var token by remember { mutableStateOf(s.token ?: "") }
     var status by remember { mutableStateOf("") }
     var refresh by remember { mutableStateOf(0) }
-    key(version, refresh) { Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Telegram (optional)", style = MaterialTheme.typography.titleMedium)
+    key(version, refresh) { FcCard(title = "Telegram") {
+        run {
+            Text("Optional: chat with the same coach from Telegram.", style = MaterialTheme.typography.bodySmall)
             when {
                 s.chatId != null && s.token != null -> {
                     Text("✅ Connected to @${s.botUsername ?: "your bot"}. Chat here or there - it is one conversation, and the coach can reach you on Telegram.",

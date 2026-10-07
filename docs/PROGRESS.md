@@ -32,6 +32,17 @@ Newest first. One dated block per session: what changed, how it was verified, an
 3. Watch: near-repeated messages, timing quality, ColorOS killing the polling service.
 
 ## Log
+- **2026-10-07 (v2.2 modern UI).**
+  - Changes: redesigned all screens on a shared dark design system (D-042).
+  - Verified:
+    - Unit tests green.
+    - Emulator screenshots of Coach, Today, Settings and a live call, with real Gemini messages.
+  - Fixed during review:
+    - a double inset above the keyboard;
+    - header alignment;
+    - raw enum text ("insufficient_data");
+    - an empty steps chart (now an empty state);
+    - your message now shows before the coach replies.
 - **2026-10-07 (v2.1 voice calls, media, dashboard).**
   - Changes: D-038…D-041 (see `CHANGELOG.md`, `AUDIT.md` B1–B5).
   - Verified with the real product:

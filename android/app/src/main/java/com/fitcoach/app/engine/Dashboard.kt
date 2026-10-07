@@ -39,9 +39,20 @@ data class DashboardData(
     /** Headline numbers (label, value), all computed from stored data; "no data" when there is none. */
     val kpis: List<Pair<String, String>>,
     val calls: List<String>,
-    /** How fresh each data source is (label, last data). */
-    val sources: List<Pair<String, String>>,
+    /** How fresh each data source is. */
+    val sources: List<Source>,
+    /** Numbers for the headline rings and tiles (null = no data). */
+    val headline: Headline,
 ) {
+    /** [ageMinutes] null = never. */
+    data class Source(val label: String, val status: String, val ageMinutes: Long?)
+
+    data class Headline(
+        val kcalToday: Int?, val kcalTarget: Int?, val proteinToday: Int?, val proteinTarget: Int?,
+        val stepsToday: Int?, val stepsAvg7: Int?, val sleepHours: Double?,
+        val weightNow: Double?, val weightStart: Double?, val weightGoal: Double?, val goalPct: Int?,
+        val adherence7Pct: Int?, val answerRatePct: Int?, val foodDays7: Int, val agentActed7: Int, val agentSilent7: Int,
+    )
     /** [days]: oldest first; values are done, smaller, skipped, postponed, missed, none or off (not scheduled). */
     data class CommitmentRow(val title: String, val schedule: String, val days: List<String>)
 }
@@ -129,6 +140,7 @@ object Dashboard {
                     "${it.str("status")}" + (it.str("summary")?.let { s -> "\n$s" } ?: "")
             },
             sources = sources(service, now),
+            headline = headline(service, now, days14, kcal14, commitments),
             quota = service.llm.usage().filterValues { !it.startsWith("0/") }.entries.joinToString { "${it.key} ${it.value}" }.ifEmpty { "unused today" },
         )
     }
@@ -199,25 +211,66 @@ object Dashboard {
         return out
     }
 
-    private fun sources(service: CoachService, now: Instant): List<Pair<String, String>> {
+    private fun sources(service: CoachService, now: Instant): List<DashboardData.Source> {
         val store = service.store
         fun ago(iso: String?): String {
             if (iso == null) return "never"
             val m = java.time.Duration.between(TimeUtil.parse(iso), now).toMinutes()
             return when { m < 60 -> "$m min ago"; m < 48 * 60 -> "${m / 60} h ago"; else -> "${m / 1440} days ago" }
         }
+        fun minutes(iso: String?) = iso?.let { java.time.Duration.between(TimeUtil.parse(it), now).toMinutes() }
+        fun day(d: String?) = d?.let { java.time.Duration.between(TimeUtil.atLocal(it, "12:00", store.tz), now).toMinutes().coerceAtLeast(0) }
         fun maxOf(sql: String, vararg args: Any?) = store.one(sql, *args)?.str("t")
+        fun src(label: String, iso: String?) = DashboardData.Source(label, ago(iso), minutes(iso))
+        val calendar = maxOf("SELECT MAX(local_date) AS t FROM calendar_days")
+        val screen = maxOf("SELECT MAX(local_date) AS t FROM screen_days")
+        val errors = store.one("SELECT COUNT(*) AS n FROM coach_decisions WHERE created_at >= ? AND kind IN ('agent_error','extraction_failed','reply_problem')",
+            TimeUtil.iso(now.minusSeconds(86_400)))?.long("n") ?: 0
         return listOf(
-            "Background loop" to ago(store.kv("last_tick_at")),
-            "Agent evaluated" to ago(store.kv("agent_last_eval_at")),
-            "Health Connect" to ago(store.lastHealthSync()),
-            "Places" to ago(maxOf("SELECT MAX(occurred_at) AS t FROM context_events WHERE source = 'geofence'")),
-            "Food orders / payments" to ago(maxOf("SELECT MAX(occurred_at) AS t FROM inferred_events")),
-            "Calendar" to (maxOf("SELECT MAX(local_date) AS t FROM calendar_days") ?: "never"),
-            "Screen time" to (maxOf("SELECT MAX(local_date) AS t FROM screen_days") ?: "never"),
-            "Telegram (last message from you)" to ago(maxOf("SELECT MAX(created_at) AS t FROM messages WHERE channel = 'telegram' AND direction = 'in'")),
-            "AI errors, 24 h" to "${store.one("SELECT COUNT(*) AS n FROM coach_decisions WHERE created_at >= ? AND kind IN ('agent_error','extraction_failed','reply_problem')",
-                TimeUtil.iso(now.minusSeconds(86_400)))?.long("n") ?: 0}",
+            src("Background loop", store.kv("last_tick_at")),
+            src("Agent evaluated", store.kv("agent_last_eval_at")),
+            src("Health Connect", store.lastHealthSync()),
+            src("Places", maxOf("SELECT MAX(occurred_at) AS t FROM context_events WHERE source = 'geofence'")),
+            src("Food orders / payments", maxOf("SELECT MAX(occurred_at) AS t FROM inferred_events")),
+            DashboardData.Source("Calendar", calendar ?: "never", day(calendar)),
+            DashboardData.Source("Screen time", screen ?: "never", day(screen)),
+            src("Telegram (last message from you)", maxOf("SELECT MAX(created_at) AS t FROM messages WHERE channel = 'telegram' AND direction = 'in'")),
+            DashboardData.Source("AI errors, 24 h", "$errors", if (errors == 0L) 0 else Long.MAX_VALUE),
+        )
+    }
+
+    private fun headline(service: CoachService, now: Instant, days14: List<String>, kcal14: List<Triple<String, Double?, Double?>>,
+                         commitments: List<DashboardData.CommitmentRow>): DashboardData.Headline {
+        val store = service.store
+        val today = store.date(now)
+        val profile = store.profile()
+        fun num(k: String) = profile.opt(k).let { if (it is Number) it.toDouble() else null }
+        val foodToday = store.foodOn(today)
+        val series = service.weightSeries(TimeUtil.daysAgo(today, 365))
+        val trend = Progress.ewma(series.map { it.second }).lastOrNull()
+        val goal = num("goal_weight_kg")
+        val start = series.firstOrNull()?.second
+        val goalPct = if (trend == null || goal == null || start == null) null
+            else if (start == goal) 100 else (((start - trend) / (start - goal)) * 100).roundToInt().coerceIn(0, 100)
+        val cells = commitments.flatMap { it.days.takeLast(7) }.filter { it != "off" && it != "none" }
+        val sent = store.query("SELECT outcome, status FROM interventions WHERE kind != 'contextual' AND local_date >= ?", TimeUtil.daysAgo(today, 6))
+            .filter { it.str("outcome") != null || it.str("status") != "sent" }
+        val decisions = store.query("SELECT kind, COUNT(*) AS n FROM coach_decisions WHERE created_at >= ? AND kind IN ('agent_act','agent_silent') GROUP BY kind",
+            TimeUtil.iso(TimeUtil.atLocal(TimeUtil.daysAgo(today, 6), "00:00", store.tz))).associate { it.str("kind")!! to (it.long("n") ?: 0L).toInt() }
+        val steps7 = days14.takeLast(7).mapNotNull { store.healthSum("steps", it) }
+        return DashboardData.Headline(
+            kcalToday = mid(kcal14.last().second, kcal14.last().third)?.roundToInt(),
+            kcalTarget = num("kcal_target")?.roundToInt(),
+            proteinToday = foodToday.takeIf { it.isNotEmpty() }?.sumOf { mid(it.dbl("protein_low"), it.dbl("protein_high")) ?: 0.0 }?.roundToInt(),
+            proteinTarget = num("protein_target_g")?.roundToInt(),
+            stepsToday = store.healthSum("steps", today)?.roundToInt(),
+            stepsAvg7 = steps7.takeIf { it.isNotEmpty() }?.average()?.roundToInt(),
+            sleepHours = store.healthSum("sleep_min", today)?.let { Math.round(it / 6) / 10.0 },
+            weightNow = trend?.let { Math.round(it * 10) / 10.0 }, weightStart = start, weightGoal = goal, goalPct = goalPct,
+            adherence7Pct = if (cells.isEmpty()) null else cells.count { it == "done" || it == "smaller" } * 100 / cells.size,
+            answerRatePct = if (sent.isEmpty()) null else sent.count { it.str("outcome") in setOf("answered", "achieved") || it.str("status") == "answered" } * 100 / sent.size,
+            foodDays7 = days14.takeLast(7).count { store.foodOn(it).isNotEmpty() },
+            agentActed7 = decisions["agent_act"] ?: 0, agentSilent7 = decisions["agent_silent"] ?: 0,
         )
     }
 }
