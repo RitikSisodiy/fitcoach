@@ -60,6 +60,7 @@ class CoachService(
     private val extractor = Extractor(llm, prompts, foods)
     private val coach = Coach(llm, prompts)
     val agent = Agent(store, llm, prompts)
+    val plan = Plan(store)
     private val lock = Mutex()
 
     companion object {
@@ -204,6 +205,7 @@ class CoachService(
         if (problems.isNotEmpty()) store.logDecision(now, "reply_problem", problems.joinToString("; ").take(300))
         store.logDecision(now, "reply", guidance.joinToString("; ").ifEmpty { "plain reply" }, JSONObject().put("extraction", extraction.summary()))
         val text = reply ?: if (problems.any { it.startsWith("llm_error") }) Coach.AI_UNAVAILABLE else Coach.NO_SAFE_REPLY
+        planChanged() // what they said may fulfil, change or call for a planned action
         listOf(send(now, text, if (reply == null) "system" else "text", msg.channel))
     }
 
@@ -586,6 +588,7 @@ class CoachService(
         store.setKv(now, "last_tick_at", TimeUtil.iso(now))
         expireInterventions(now)
         expireCalls(now)
+        plan.expire(now)
         dailyJobs(now)
         autoCompleteFromHealth(now)
         processInferred(now)
@@ -603,6 +606,9 @@ class CoachService(
         val why = when {
             force -> "forced"
             newObs.any { it.long("significant") == 1L } -> "new observation: " + newObs.last { it.long("significant") == 1L }.str("summary")
+            // Anything the person says may fulfil, change or ask for a planned action, so the plan is re-checked at once
+            // (bounded by MAX_EVALS_PER_DAY).
+            newObs.any { it.str("kind")?.startsWith("user_") == true } -> "new from the person"
             nextCheck == null -> "first evaluation"
             !now.isBefore(nextCheck) -> "scheduled check: " + (store.kv("agent_next_check_reason") ?: "")
             lastEval == null || Duration.between(lastEval, now) > MAX_SILENT_EVAL -> "no evaluation for a long time"
@@ -615,7 +621,7 @@ class CoachService(
 
         val eng = Engagement.compute(store, now, Policy.effectiveBudget(profile))
         val limits = sendLimits(now, eng)
-        val situation = agent.situation(now, buildContext(now), newObs, eng, limits, channels(), weeklyStats(now))
+        val situation = agent.situation(now, buildContext(now), newObs, eng, limits, channels(), weeklyStats(now), plan.asSituation(now))
         store.setKv(now, "agent_last_eval_at", TimeUtil.iso(now))
         newObs.lastOrNull()?.long("id")?.let { store.setKv(now, "agent_last_obs_id", it.toString()) }
         val d = agent.decide(situation)
@@ -624,10 +630,20 @@ class CoachService(
             store.logDecision(now, "agent_error", "LLM unavailable; retrying in 30 min (woke for: $why)")
             return@withLock emptyList()
         }
-        scheduleCheck(now, d.nextCheckMinutes, d.nextCheckReason)
         applyAgentOutcomes(now, d)
+        applyPlan(now, d)
+        // The agent looks again at its own chosen time, or earlier when one of its planned windows opens.
+        val wake = plan.nextWake()
+        val untilWake = wake?.let { Duration.between(now, it.first).toMinutes().toInt() }
+        if (wake != null && untilWake!! in 1 until d.nextCheckMinutes) scheduleCheck(now, untilWake, "planned: ${wake.second}")
+        else scheduleCheck(now, d.nextCheckMinutes, d.nextCheckReason)
         val canSend = limits.getBoolean("can_send_now")
         val data = d.asJson().put("woke_for", why)
+        val carried = d.executesIntentionId?.let { plan.get(it) }
+        if (d.act && carried?.str("status") == "muted") {
+            store.logDecision(now, "agent_blocked", "Wanted to carry out '${carried.str("title")}' but you muted it", data)
+            return@withLock emptyList()
+        }
         if (!d.act || d.message.isNullOrBlank()) {
             store.logDecision(now, "agent_silent", d.reason, data)
             return@withLock emptyList()
@@ -649,6 +665,7 @@ class CoachService(
         ))
         store.logDecision(now, "agent_act", "${d.intent} via $channel: ${d.reason}", data)
         val out = send(now, d.message, "nudge", channel, d.quickReplies, iid)
+        if (carried?.str("status") == "planned") plan.resolve(now, carried.long("id")!!, "done", "contacted you via $channel", iid)
         if (channel != "call") return@withLock listOf(out)
         listOf(out.copy(callId = store.insert("calls", mapOf("intervention_id" to iid, "status" to "ringing",
             "purpose" to "${d.message}\n(Your reasoning: ${d.reason})", "rang_at" to TimeUtil.iso(now)))))
@@ -664,8 +681,20 @@ class CoachService(
         }
     }
 
+    /** Applies the agent's re-evaluation of its plan, then its new intentions (validated by [Plan]). */
+    private fun applyPlan(now: Instant, d: AgentDecision) {
+        val lines = plan.apply(now, d.planUpdates) + d.plan.map { p ->
+            val (id, why) = plan.add(now, p.copy(commitmentId = p.commitmentId?.takeIf { store.commitment(it) != null }))
+            if (id != null) "planned #$id ${p.title} at ${p.windowStart}" else "plan '${p.title}' rejected: $why"
+        }
+        if (lines.isNotEmpty()) store.logDecision(now, "agent_plan", lines.joinToString("; ").take(600))
+    }
+
+    /** User controls on the plan (the dashboard). */
+    fun mutePlanned(now: Instant, id: Long, muted: Boolean) = plan.mute(now, id, muted).also { if (it) planChanged() }
+
     private fun scheduleCheck(now: Instant, minutes: Int, reason: String) {
-        store.setKv(now, "agent_next_check_at", TimeUtil.iso(now.plusSeconds(minutes.coerceIn(15, 720) * 60L)))
+        store.setKv(now, "agent_next_check_at", TimeUtil.iso(now.plusSeconds(minutes.coerceIn(5, 720) * 60L)))
         store.setKv(now, "agent_next_check_reason", reason.take(200))
     }
 
@@ -699,6 +728,8 @@ class CoachService(
     /** Which channels the agent can use; set by the Android layer (Telegram pairing, call permissions). */
     var telegramLinked: () -> Boolean = { false }
     var callsSupported: () -> Boolean = { false }
+    /** Asks the Android layer to run the agent soon (re-evaluate the plan); set by FitCoachApp. */
+    var planChanged: () -> Unit = {}
 
     private fun channels(): JSONObject = JSONObject().put("telegram_linked", telegramLinked())
         .put("last_inbound_channel", store.lastInboundChannel() ?: JSONObject.NULL)

@@ -32,6 +32,19 @@ Newest first. One dated block per session: what changed, how it was verified, an
 3. Watch: near-repeated messages, timing quality, ColorOS killing the polling service.
 
 ## Log
+- **2026-10-07 (v2.3 agent plan).**
+  - Changes: short-term intentions with re-evaluation (D-043) and the Up next card.
+  - Verified:
+    - 5 new unit tests: planning, wake at the window, cancel after a message, muted items never run or change, done, and validation.
+    - `LivePlanTest` with real Gemini: dinner check cancelled after the person reported dinner; nothing sent.
+    - **Emulator, real key:**
+      1. "6:30 baje gym yaad dila dena" → the agent planned a gym reminder for 18:25–18:55 with its reason.
+      2. "aaj gym nahi, ghutne me dard" → the agent cancelled it ("User cancelled gym today due to knee pain").
+      3. Mute and Pause/Resume work.
+      4. The DB migrated v3 → v4 in place.
+  - Found during verification:
+    - Every user message must wake the agent: a 10-minute debounce delayed a requested reminder.
+    - The agent cancelled an item just because it was muted. Now only the person changes muted items (code and prompt).
 - **2026-10-07 (v2.2 modern UI).**
   - Changes: redesigned all screens on a shared dark design system (D-042).
   - Verified:

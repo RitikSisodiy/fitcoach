@@ -4,6 +4,8 @@ Priority: P0 (blocks real use) · P1 (high value) · P2 (later). Status: TODO ·
 
 ## DONE
 
+- [x] v2.3: agent plan (temporary intentions, Up next, mute/pause, re-evaluation) (D-043)
+
 - [x] v2.1: voice calls (Gemini Live), Telegram photo/voice fix, dashboard KPIs and source health, update status UI, generic re-audit (D-038…D-041)
 
 - [x] v2 autonomous agent: audit, agent loop, memory tiers, outcome learning, Telegram, dashboard (D-032…D-037)

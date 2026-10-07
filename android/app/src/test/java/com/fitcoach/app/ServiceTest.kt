@@ -241,6 +241,83 @@ class ServiceTest {
         db.close()
     }
 
+    // ------------------------------------------------------- short-term plan
+    private fun planDecision(extra: String) =
+        """{"act":false,"reason":"plan","next_check_minutes":240,"next_check_reason":"later"$extra}"""
+
+    @Test fun agentPlansAnIntentionAndWakesAtItsWindow() = runTest {
+        llm.decide = planDecision(""","plan":[{"title":"Ask how dinner went","reason":"Dinner is the meal they forget to log",
+            "channel":"notification","window_start":"20:00","window_end":"20:30","skip_if":"they log dinner first"}]""")
+        service.tick(at("2026-10-06", "17:00"))
+        val i = service.plan.open().single()
+        assertEquals("Ask how dinner went", i.str("title"))
+        assertEquals("planned", i.str("status"))
+        assertEquals(service.store.kv("agent_next_check_at"), i.str("window_start")) // wakes when the window opens, not at 21:00
+        assertTrue(store.recentDecisions(5).any { it.str("kind") == "agent_plan" })
+    }
+
+    @Test fun whatThePersonSaysReEvaluatesThePlanAndCanCancelIt() = runTest {
+        llm.decide = planDecision(""","plan":[{"title":"Ask how dinner went","reason":"r","channel":"notification",
+            "window_start":"20:00","window_end":"20:30","skip_if":"they log dinner first"}]""")
+        service.tick(at("2026-10-06", "17:00"))
+        val id = service.plan.open().single().long("id")!!
+        var asked = false
+        service.planChanged = { asked = true }
+        llm.extraction = "{}"
+        service.handleMessage(Inbound("dinner me dal chawal khaya", at("2026-10-06", "19:30")))
+        assertTrue(asked) // the Android layer is asked to run the agent now
+        llm.decide = planDecision(""","plan_updates":[{"intention_id":$id,"action":"cancel","reason":"they already told me dinner at 19:30"}]""")
+        val before = llm.calls["decide"]
+        service.tick(at("2026-10-06", "19:31")) // not its scheduled time: woken by the message because a plan is open
+        assertEquals(before!! + 1, llm.calls["decide"])
+        assertTrue(llm.lastDecidePrompt.contains("Ask how dinner went"))
+        val row = service.plan.get(id)!!
+        assertEquals("cancelled", row.str("status"))
+        assertEquals("they already told me dinner at 19:30", row.str("resolution"))
+        assertTrue(service.plan.open().isEmpty())
+    }
+
+    @Test fun mutedIntentionIsNeverCarriedOut() = runTest {
+        llm.decide = planDecision(""","plan":[{"title":"Evening walk nudge","reason":"r","channel":"notification",
+            "window_start":"18:00","window_end":"19:00","skip_if":"a walk is recorded"}]""")
+        service.tick(at("2026-10-06", "17:00"))
+        val id = service.plan.open().single().long("id")!!
+        assertTrue(service.mutePlanned(at("2026-10-06", "17:10"), id, true))
+        llm.decide = planDecision(""","plan_updates":[{"intention_id":$id,"action":"cancel","reason":"muted"}]""")
+        service.tick(at("2026-10-06", "17:12"), force = true)
+        assertEquals("muted", service.plan.get(id)!!.str("status")) // only the person changes a muted item
+        llm.decide = act("Walk time?", extra = ""","executes_intention_id":$id""")
+        assertTrue(service.tick(at("2026-10-06", "18:05"), force = true).isEmpty())
+        assertTrue(store.recentDecisions(3).any { it.str("kind") == "agent_blocked" && it.str("summary")!!.contains("muted") })
+        assertEquals(0, store.query("SELECT * FROM interventions").size)
+        service.tick(at("2026-10-06", "19:30"))
+        assertEquals("expired", service.plan.get(id)!!.str("status"))
+    }
+
+    @Test fun carryingOutAnIntentionMarksItDone() = runTest {
+        llm.decide = planDecision(""","plan":[{"title":"Check protein","reason":"r","channel":"notification",
+            "window_start":"13:00","window_end":"14:00","skip_if":"lunch logged"}]""")
+        service.tick(at("2026-10-06", "11:00"))
+        val id = service.plan.open().single().long("id")!!
+        llm.decide = act("Lunch me protein tha?", extra = ""","executes_intention_id":$id""")
+        assertEquals(1, service.tick(at("2026-10-06", "13:05")).size)
+        val row = service.plan.get(id)!!
+        assertEquals("done", row.str("status"))
+        assertNotNull(row.long("intervention_id"))
+    }
+
+    @Test fun planIsValidatedShortAndBounded() = runTest {
+        llm.decide = planDecision(""","plan":[{"title":"bad","reason":"r","channel":"call","window_start":"23:15","window_end":"23:45","skip_if":"x"},
+            {"title":"bad2","reason":"r","channel":"call","window_start":"later","skip_if":"x"},
+            {"title":"ok","reason":"r","channel":"notification","window_start":"11:00","window_end":"11:30","skip_if":"x"}]""")
+        service.tick(at("2026-10-06", "09:00"))
+        assertEquals(listOf("ok"), service.plan.open().map { it.str("title") }) // quiet hours and invalid windows are rejected
+        assertTrue(store.recentDecisions(5).any { it.str("summary")!!.contains("inside quiet hours") })
+        val w = service.plan.window(at("2026-10-06", "21:00"), "08:00", "08:20")!!
+        assertEquals(at("2026-10-07", "08:00"), w.first) // next occurrence, within 24 h
+        assertEquals(at("2026-10-07", "08:30"), w.second) // at least 30 min
+    }
+
     // ----------------------------------------------------------- voice calls
     private fun callDecision(message: String) = act(message).replace("\"channel\":\"telegram\"", "\"channel\":\"call\"")
 

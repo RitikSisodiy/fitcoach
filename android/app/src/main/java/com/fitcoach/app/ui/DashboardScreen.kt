@@ -23,6 +23,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.Icon
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -92,6 +95,7 @@ fun DashboardScreen(app: FitCoachApp) {
         }
         if (d == null) { item { EmptyHint(error ?: "Loading…") }; return@LazyColumn }
         val h = d.headline
+        item { PlanCard(app, d) }
         item { TodayRings(h, d) }
         item { GoalCard(d, h) }
         item {
@@ -141,6 +145,81 @@ fun DashboardScreen(app: FitCoachApp) {
         item { BrainCard(d) }
         item { ActivityCard(d) }
         item { SourcesCard(d, access) { Scheduler.runNow(ctx) } }
+    }
+}
+
+/** The agent's near-term intentions: what it may do, when, why, and what would cancel it. The person can mute any of them. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PlanCard(app: FitCoachApp, d: DashboardData) {
+    val scope = rememberCoroutineScope()
+    var history by remember { mutableStateOf(false) }
+    fun io(block: () -> Unit) = scope.launch(Dispatchers.IO) { block(); app.notifyDataChanged() }
+    FcCard(title = "Up next", action = { Text("next 24 h", style = MaterialTheme.typography.labelMedium, color = Fc.TextMuted) }) {
+        if (d.pausedUntil != null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StatusDot(Fc.Warn)
+                Spacer(Modifier.width(8.dp))
+                Text("Coaching paused until ${d.pausedUntil}", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = Fc.Text)
+                Pill("Resume", Fc.Accent, onClick = { io { app.service().resume(Instant.now()) } })
+            }
+        }
+        if (d.plan.isEmpty()) EmptyHint("Nothing planned. The coach re-plans as things happen, and stays quiet when nothing would help.")
+        d.plan.forEach { p -> PlanRow(p) { muted -> io { app.service().mutePlanned(Instant.now(), p.id, muted) } } }
+        Text("Coach looks again ${d.agentNextCheck ?: "soon"}" + (d.agentPlan?.let { " · $it" } ?: ""), style = MaterialTheme.typography.bodySmall)
+        if (d.pausedUntil == null) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Pill("Pause 2 h", Fc.TextMuted, onClick = { io { app.service().pause(Instant.now(), 2.0 / 24) } })
+            Pill("Pause rest of today", Fc.TextMuted, onClick = {
+                io {
+                    val now = Instant.now()
+                    val midnight = LocalDate.now(app.store.tz).plusDays(1).atStartOfDay(app.store.tz).toInstant()
+                    app.service().pause(now, java.time.Duration.between(now, midnight).seconds / 86400.0)
+                }
+            })
+        }
+        if (d.planHistory.isNotEmpty()) {
+            TextButton(onClick = { history = !history }, contentPadding = PaddingValues(0.dp)) {
+                Text(if (history) "Hide recent changes" else "Recent changes (${d.planHistory.size})", color = Fc.Accent)
+            }
+            if (history) d.planHistory.forEach { p ->
+                val color = when (p.status) { "done" -> Fc.Good; "cancelled" -> Fc.Violet; else -> Fc.TextFaint }
+                Row(verticalAlignment = Alignment.Top) {
+                    Box(Modifier.padding(top = 6.dp).size(8.dp).clip(CircleShape).background(color))
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        Text("${p.status.replaceFirstChar { it.uppercase() }} ${p.eta} · ${p.title}", style = MaterialTheme.typography.labelMedium, color = Fc.Text)
+                        p.resolution?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlanRow(p: DashboardData.PlanItem, onMute: (Boolean) -> Unit) {
+    val muted = p.status == "muted"
+    val (icon, color) = when (p.channel) { "call" -> FcIcons.Phone to Fc.Violet; "telegram" -> FcIcons.Send to Fc.Cyan; else -> FcIcons.Chat to Fc.Accent }
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Fc.SurfaceHigh).padding(14.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(Modifier.size(36.dp).clip(CircleShape).background(color.copy(alpha = if (muted) 0.06f else 0.16f)), contentAlignment = Alignment.Center) {
+            Icon(icon, null, Modifier.size(18.dp), tint = if (muted) Fc.TextFaint else color)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(p.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = if (muted) Fc.TextMuted else Fc.Text)
+                Pill(if (muted) "muted" else p.eta, when { muted -> Fc.TextFaint; p.status == "due" -> Fc.Warn; else -> color })
+            }
+            Text("${when (p.channel) { "call" -> "Voice call"; "telegram" -> "Telegram"; else -> "Notification" }} · ${p.window} · planned ${p.created}",
+                style = MaterialTheme.typography.labelSmall, color = Fc.TextMuted)
+            Text("Why: ${p.reason}", style = MaterialTheme.typography.bodySmall, color = Fc.Text)
+            p.skipIf?.let { Text("Skips if: $it", style = MaterialTheme.typography.bodySmall) }
+            p.note?.let { Text(it.replaceFirstChar { c -> c.uppercase() }, style = MaterialTheme.typography.bodySmall, color = Fc.TextFaint) }
+            Row(Modifier.padding(top = 4.dp)) { Pill(if (muted) "Unmute" else "Mute", if (muted) Fc.Accent else Fc.TextMuted, onClick = { onMute(!muted) }) }
+        }
     }
 }
 

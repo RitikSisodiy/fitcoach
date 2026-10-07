@@ -22,11 +22,18 @@ data class AgentDecision(
     val quickReplies: List<String>, val channel: String, val expectedOutcome: String?, val nextCheckMinutes: Int, val nextCheckReason: String,
     /** Commitments the agent judged done/skipped from observations, with its evidence: (id, outcome, evidence). */
     val commitmentOutcomes: List<Triple<Long, String, String>> = emptyList(),
+    /** New short-term intentions (next 24 h), re-evaluations of open ones, and the intention this message carries out. */
+    val plan: List<PlanDraft> = emptyList(),
+    val planUpdates: List<PlanUpdate> = emptyList(),
+    val executesIntentionId: Long? = null,
 ) {
     fun asJson(): JSONObject = JSONObject().put("act", act).put("reason", reason).put("intent", intent)
         .put("commitment_id", commitmentId ?: JSONObject.NULL).put("message", message ?: JSONObject.NULL)
         .put("quick_replies", JSONArray(quickReplies)).put("channel", channel).put("expected_outcome", expectedOutcome ?: JSONObject.NULL)
         .put("next_check_minutes", nextCheckMinutes).put("next_check_reason", nextCheckReason)
+        .put("plan", JSONArray(plan.map { JSONObject().put("title", it.title).put("window", "${it.windowStart}-${it.windowEnd ?: ""}").put("channel", it.channel) }))
+        .put("plan_updates", JSONArray(planUpdates.map { JSONObject().put("intention_id", it.id).put("action", it.action).put("reason", it.reason) }))
+        .put("executes_intention_id", executesIntentionId ?: JSONObject.NULL)
 
     companion object {
         fun parse(o: JSONObject): AgentDecision = AgentDecision(
@@ -47,7 +54,25 @@ data class AgentDecision(
                     if (!c.has("commitment_id") || out == null || ev.isEmpty()) null else Triple(c.optLong("commitment_id"), out, ev.take(200))
                 }
             },
+            plan = objects(o.optJSONArray("plan")).mapNotNull { p ->
+                val title = p.optString("title").trim(); val reason = p.optString("reason").trim(); val start = p.optString("window_start").trim()
+                if (title.isEmpty() || reason.isEmpty() || start.isEmpty()) null else PlanDraft(
+                    title, reason, p.optString("channel").takeIf { it in setOf("telegram", "call") } ?: "notification",
+                    p.optString("intent").ifBlank { "check_in" }, start, p.optString("window_end").takeIf { it.isNotBlank() },
+                    p.optString("skip_if").takeIf { it.isNotBlank() && it != "null" },
+                    if (p.has("commitment_id") && !p.isNull("commitment_id")) p.optLong("commitment_id") else null,
+                )
+            }.take(3),
+            planUpdates = objects(o.optJSONArray("plan_updates")).mapNotNull { u ->
+                val action = u.optString("action").takeIf { it in setOf("keep", "cancel", "reschedule") }
+                if (!u.has("intention_id") || action == null) null
+                else PlanUpdate(u.optLong("intention_id"), action, u.optString("reason").ifBlank { "no reason given" },
+                    u.optString("window_start").takeIf { it.isNotBlank() }, u.optString("window_end").takeIf { it.isNotBlank() })
+            },
+            executesIntentionId = if (o.has("executes_intention_id") && !o.isNull("executes_intention_id")) o.optLong("executes_intention_id") else null,
         )
+
+        private fun objects(a: JSONArray?): List<JSONObject> = if (a == null) emptyList() else (0 until a.length()).mapNotNull { a.optJSONObject(it) }
     }
 }
 
@@ -62,6 +87,7 @@ class Agent(private val store: Store, private val llm: LlmProvider, private val 
 
     fun situation(
         now: Instant, context: JSONObject, newObs: List<Row>, eng: Engagement, limits: JSONObject, channels: JSONObject, weekly: JSONObject,
+        plan: JSONObject = JSONObject(),
     ): JSONObject {
         val today = store.date(now)
         val todayD = LocalDate.parse(today)
@@ -99,14 +125,14 @@ class Agent(private val store: Store, private val llm: LlmProvider, private val 
             .put("recent_interventions", recentInterventions(now))
             .put("engagement", eng.asContext().put("response_by_hour", responseByHour(today)).put("response_by_channel", responseByChannel(today)))
             .put("recent_conversation", JSONArray(store.allMessages(8).map {
-                "${store.fmtLocal(TimeUtil.parse(it.str("created_at")!!), "EEE HH:mm")} ${if (it.str("direction") == "in") "user" else "coach"} (${it.str("channel")}): ${it.str("text")?.take(160)}"
+                "${store.fmtLocal(TimeUtil.parse(it.str("created_at")!!), "EEE HH:mm")} ${if (it.str("direction") == "in") "user" else "coach"} (${it.str("channel")}): ${it.str("text")?.let { t -> if (t.length > 300) t.take(300) + " [...shortened here]" else t }}"
             }))
             .put("weight", context.get("weight"))
             .put("last_7_days", context.get("last_7_days"))
             .put("week", weekly)
             .put("channels", channels)
             .put("limits", limits)
-            .put("your_last_plan", store.kv("agent_next_check_reason") ?: JSONObject.NULL)
+            .put("your_plan", plan.put("last_next_check_reason", store.kv("agent_next_check_reason") ?: JSONObject.NULL))
     }
 
     /** Things the coach cannot infer from data; the agent decides if and when asking is worth it. */

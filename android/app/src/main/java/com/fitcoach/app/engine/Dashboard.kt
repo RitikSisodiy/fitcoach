@@ -43,7 +43,16 @@ data class DashboardData(
     val sources: List<Source>,
     /** Numbers for the headline rings and tiles (null = no data). */
     val headline: Headline,
+    /** The agent's open intentions (next 24 h) and what happened to recent ones. */
+    val plan: List<PlanItem> = emptyList(),
+    val planHistory: List<PlanItem> = emptyList(),
 ) {
+    /** [status]: planned, due, muted, done, cancelled, expired. [eta]: "in 40 min", "due now"... */
+    data class PlanItem(
+        val id: Long, val title: String, val reason: String, val channel: String, val window: String, val eta: String,
+        val status: String, val skipIf: String?, val created: String, val resolution: String?, val note: String?,
+    )
+
     /** [ageMinutes] null = never. */
     data class Source(val label: String, val status: String, val ageMinutes: Long?)
 
@@ -141,6 +150,8 @@ object Dashboard {
             },
             sources = sources(service, now),
             headline = headline(service, now, days14, kcal14, commitments),
+            plan = service.plan.open().map { planItem(service, now, it) },
+            planHistory = service.plan.recent(now, 24).take(8).map { planItem(service, now, it) },
             quota = service.llm.usage().filterValues { !it.startsWith("0/") }.entries.joinToString { "${it.key} ${it.value}" }.ifEmpty { "unused today" },
         )
     }
@@ -271,6 +282,24 @@ object Dashboard {
             answerRatePct = if (sent.isEmpty()) null else sent.count { it.str("outcome") in setOf("answered", "achieved") || it.str("status") == "answered" } * 100 / sent.size,
             foodDays7 = days14.takeLast(7).count { store.foodOn(it).isNotEmpty() },
             agentActed7 = decisions["agent_act"] ?: 0, agentSilent7 = decisions["agent_silent"] ?: 0,
+        )
+    }
+
+    private fun planItem(service: CoachService, now: Instant, r: com.fitcoach.app.data.Row): DashboardData.PlanItem {
+        val store = service.store
+        val start = TimeUtil.parse(r.str("window_start")!!); val end = TimeUtil.parse(r.str("window_end")!!)
+        val day = if (store.date(start) == store.date(now)) "" else store.fmtLocal(start, "EEE ")
+        val status = r.str("status")!!.let { if (it == "planned" && !now.isBefore(start)) "due" else it }
+        val mins = java.time.Duration.between(now, start).toMinutes()
+        val eta = when (status) {
+            "due" -> "due now"
+            "planned", "muted" -> if (mins < 60) "in $mins min" else "in ${mins / 60} h ${mins % 60} min"
+            else -> r.str("resolved_at")?.let { store.fmtLocal(TimeUtil.parse(it), "HH:mm") } ?: ""
+        }
+        return DashboardData.PlanItem(
+            r.long("id")!!, r.str("title") ?: "", r.str("reason") ?: "", r.str("channel") ?: "notification",
+            "$day${store.fmtLocal(start, "HH:mm")}–${store.fmtLocal(end, "HH:mm")}", eta, status, r.str("skip_if"),
+            store.fmtLocal(TimeUtil.parse(r.str("created_at")!!), "HH:mm"), r.str("resolution"), r.str("note"),
         )
     }
 }

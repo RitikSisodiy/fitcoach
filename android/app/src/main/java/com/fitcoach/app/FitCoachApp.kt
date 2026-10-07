@@ -67,6 +67,7 @@ class FitCoachApp : Application() {
         return CoachService(store, llm, foods, prompts).also {
             it.telegramLinked = { Telegram.isLinked(this) }
             it.callsSupported = { CallManager.canCall(this) }
+            it.planChanged = { Scheduler.runNow(this) }
             cachedService = it; cachedKey = key
         }
     }

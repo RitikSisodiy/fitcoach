@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.3.0 — 2026-10-07 (agent plan)
+
+### Added
+- **Today → Up next:**
+  - shows the agent's near-term intentions (next 24 h): voice call, notification or Telegram;
+  - for each: the window, time to go, why, "skips if…", when it was planned, and its status;
+  - recent changes, with the reason each item was cancelled, done or expired;
+  - "Mute" per item, plus "Pause 2 h", "Pause rest of today" and "Resume".
+- **The agent re-evaluates its plan whenever something new happens** (any message, observation or mute). It cancels or reschedules intentions whose purpose is met or no longer relevant. Windows only wake the agent; they never send anything by themselves.
+- `LivePlanTest`, with real Gemini:
+  1. The agent planned "Ask how dinner went" for 21:00 by itself.
+  2. The person reported dinner at 19:30.
+  3. The agent cancelled the intention ("they already logged dinner early at 19:30") and sent nothing.
+
 ## 2.2.0 — 2026-10-07 (modern UI)
 
 ### Changed

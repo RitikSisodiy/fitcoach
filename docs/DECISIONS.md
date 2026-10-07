@@ -291,6 +291,16 @@ Memory items must be grounded in the user's words, like food items. Every reply 
 ### D-041 — Update status is visible
 **Decision.** Setup shows the installed and latest versions, the last check time and any error (GitHub rate limit, network, install failure with its reason), plus "Check now", "Update to X" and the release notes. A failed check is never silent.
 
+### D-043 — The plan is temporary intentions, re-evaluated, never a schedule
+**Decision.**
+- The agent can hold up to 5 intentions for the next 24 h. Each has a title, reason, channel, window and skip_if.
+- On every wake-up it must return keep, cancel or reschedule for each open one, with a reason.
+- A window never sends anything; it only wakes the agent, which decides again with fresh context.
+- The person sees the plan, why each item exists and what would cancel it. They can mute single items (the agent may not carry out or change a muted item) or pause all coaching for 2 h or the rest of the day.
+- Any new message wakes the agent, so a planned check whose purpose is already met is dropped before its window.
+
+**Rejected:** scheduled reminders or jobs per intention. They would fire on stale information, which is exactly the "asks about dinner after I already told it" failure.
+
 ### D-042 — One design system, always dark
 **Decision.** Colours, type and shapes live in `ui/Theme.kt` (`Fc` tokens). Every screen uses the shared components in `ui/Components.kt` and the app's own vector icons in `ui/Icons.kt`. The app is always dark; the user chose a "dark premium" style.
 **Why:**

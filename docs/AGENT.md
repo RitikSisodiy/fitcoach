@@ -52,6 +52,22 @@ The agent writes up to 3 quick replies per message. A tap is the user's own mess
 - **Inbound:** text, voice and photo from the paired chat go to `handleMessage(channel="telegram")`.
 - **Outbound:** replies go back to Telegram. Proactive messages go there when the agent chooses the Telegram channel.
 
+## Short-term plan: temporary intentions (D-043)
+```
+Observe -> Reason (Agent.decide) -> intention {title, reason, channel, window <= 24 h ahead, skip_if}  (table intentions)
+   -> shown in Today > Up next (why, when, what would cancel it; Mute / Pause)
+   -> any new message / observation / mute -> agent re-evaluates EVERY open intention: keep | cancel(reason) | reschedule
+   -> its window opening only WAKES the agent -> it decides again: act (executes_intention_id) / reschedule / cancel
+   -> done | cancelled | expired (window passed) | muted (only the person changes it)
+```
+- Code (`engine/Plan.kt`) only stores and validates intentions:
+  - a 24 h horizon;
+  - a 30 min to 4 h window;
+  - nothing inside quiet hours;
+  - at most 5 open, at most 3 new per decision.
+- It also aligns the next wake-up to the earliest window, expires passed windows, blocks muted ones, and records why each intention ended.
+- Every user message triggers a re-evaluation (bounded by the daily evaluation cap).
+
 ## Media (D-039)
 Photos and voice notes from any channel go to the multimodal extraction call. That call also writes `media_summary` (a transcript, or what the photo shows). The summary is stored as the message content and handed to the reply, so memory and later answers work on what was in the media.
 

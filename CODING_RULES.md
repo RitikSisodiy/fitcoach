@@ -77,3 +77,5 @@ Update it when you learn something reusable (add it under "Lessons"). Keep it sh
 - Live tests that call `tick()` run at any hour. Move quiet hours away from now inside the test, or the agent never runs.
 - OkHttp 4 from Kotlin: use the extension APIs (`toMediaType()`, `asRequestBody()`, `response.body`). The Java-style statics are errors.
 - Run `lintVitalRelease assembleRelease` locally before pushing new Activities or dependencies. CI's release lint rejected `registerForActivityResult` in a plain `ComponentActivity`, because an old Fragment comes in transitively. Debug builds don't run that check.
+- Agent intentions must never fire on their own. A planned time only wakes the LLM, which decides again with fresh context. Otherwise stale plans message people about things they already did.
+- User controls (mute, pause) are enforced in code, not only in the prompt. The LLM will "helpfully" cancel or work around them.

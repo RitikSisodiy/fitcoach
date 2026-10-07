@@ -27,7 +27,7 @@ class Db(context: Context?, name: String? = "coach.db") :
     }
 
     companion object {
-        const val SCHEMA_VERSION = 3
+        const val SCHEMA_VERSION = 4
 
         val MIGRATIONS = listOf(
             // v2: agent loop, channels, memory tiers, intervention outcomes.
@@ -50,6 +50,14 @@ class Db(context: Context?, name: String? = "coach.db") :
                 "ALTER TABLE food_events ADD COLUMN off_plan INTEGER NOT NULL DEFAULT 0",
                 """CREATE TABLE calls (id INTEGER PRIMARY KEY, intervention_id INTEGER, status TEXT NOT NULL, purpose TEXT,
                     rang_at TEXT NOT NULL, answered_at TEXT, ended_at TEXT, model TEXT, summary TEXT, transcript_json TEXT)""",
+            ),
+            // v4: the agent's short-term plan (temporary intentions, D-043).
+            listOf(
+                """CREATE TABLE intentions (id INTEGER PRIMARY KEY, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, status TEXT NOT NULL,
+                    title TEXT NOT NULL, reason TEXT NOT NULL, channel TEXT NOT NULL, intent TEXT, window_start TEXT NOT NULL,
+                    window_end TEXT NOT NULL, skip_if TEXT, commitment_id INTEGER, intervention_id INTEGER, resolved_at TEXT,
+                    resolution TEXT, note TEXT)""",
+                "CREATE INDEX idx_intentions_status ON intentions(status, window_start)",
             ),
         )
 
