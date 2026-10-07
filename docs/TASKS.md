@@ -50,6 +50,8 @@ Priority: P0 (blocks real use) · P1 (high value) · P2 (later). Status: TODO ·
 
 ## TODO
 
+- [ ] **P1** Android + iPhone (plan in `docs/mobile/TASKS.md`, MP-0…MP-22). Waiting on the user's decisions in Phase 0: host, Apple Developer Program, Firebase.
+
 - [ ] **P0** On the real phone: allow "full-screen calls" (Setup) and take one real coach call. Check the earpiece/speaker audio and the echo cancellation on ColorOS.
 - [ ] **P1** Only one device can poll the Telegram bot: the emulator got 409 Conflict while the phone was polling. Fine in real use; tests must stop the phone's polling or use another bot.
 - [ ] **P2** Live session resumption (`goAway`) for calls longer than about 10 min. Calls are short today.
