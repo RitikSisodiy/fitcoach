@@ -1,5 +1,7 @@
 # Mobile platform decisions (M-xxx)
 
+> **Status: DROPPED (2026-10-07).** The user decided to stay Android-only. This file is kept as a reference only; nothing here is planned. See D-044 in `../DECISIONS.md`.
+
 Evidence: [RESEARCH.md](RESEARCH.md). Design: [ARCHITECTURE.md](ARCHITECTURE.md). These supersede D-027 ("no server") once implemented.
 
 ### M-001: Move the agent to a backend; phones become clients

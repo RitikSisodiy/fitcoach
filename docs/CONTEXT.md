@@ -35,7 +35,7 @@ A personal, proactive AI fitness coach for one lazy user (Hinglish, India).
 - `docs/ANDROID.md`: app design and the first-run checklist.
 - `docs/AGENT.md`: the agent loop.
 - `docs/AUDIT.md`: what v1.1 got wrong.
-- `docs/mobile/`: Android + iPhone research, the backend + KMP architecture, decisions (M-xxx) and the phased plan (MP-xx).
+- `docs/mobile/`: Android + iPhone research. **Dropped**: the app stays Android-only. Reference only.
 - `docs/voice/`: voice research, architecture, decisions (V-xxx) and the task plan (VT-xx).
 
 ## Environments

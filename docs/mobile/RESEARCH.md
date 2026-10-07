@@ -1,5 +1,7 @@
 # Research: Android + iPhone for the FitCoach agent (2026-10-07)
 
+> **Status: DROPPED (2026-10-07).** The user decided to stay Android-only. This file is kept as a reference only; nothing here is planned. See D-044 in `../DECISIONS.md`.
+
 **Question:** can the companion app run on both Android and iPhone? It must keep:
 - background context collection;
 - proactive notifications;

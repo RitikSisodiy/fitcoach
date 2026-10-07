@@ -1,5 +1,7 @@
 # Architecture: one agent backend, two native-capable clients
 
+> **Status: DROPPED (2026-10-07).** The user decided to stay Android-only. This file is kept as a reference only; nothing here is planned. See D-044 in `../DECISIONS.md`.
+
 Evidence: [RESEARCH.md](RESEARCH.md). Decisions: [DECISIONS.md](DECISIONS.md) (M-001…).
 
 ## 1. Shape

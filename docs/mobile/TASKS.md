@@ -1,5 +1,7 @@
 # Mobile platform tasks (plan only — not started)
 
+> **Status: DROPPED (2026-10-07).** The user decided to stay Android-only. This file is kept as a reference only; nothing here is planned. See D-044 in `../DECISIONS.md`.
+
 Follows [ARCHITECTURE.md](ARCHITECTURE.md) and [DECISIONS.md](DECISIONS.md). Every task has a test. Phases ship in order (M-007).
 
 ## Phase 0: decisions and accounts (user)

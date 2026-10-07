@@ -32,6 +32,7 @@ Newest first. One dated block per session: what changed, how it was verified, an
 3. Watch: near-repeated messages, timing quality, ColorOS killing the polling service.
 
 ## Log
+- **2026-10-07 (iPhone plan dropped).** After the Android + iPhone research (`docs/mobile/`), the user decided to stay Android-only. The docs are marked dropped; D-044 is recorded; no code changed.
 - **2026-10-07 (v2.3 agent plan).**
   - Changes: short-term intentions with re-evaluation (D-043) and the Up next card.
   - Verified:

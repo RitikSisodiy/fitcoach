@@ -4,6 +4,8 @@ Priority: P0 (blocks real use) · P1 (high value) · P2 (later). Status: TODO ·
 
 ## DONE
 
+- [x] Android + iPhone research (`docs/mobile/`). **Dropped by the user**: the app stays Android-only (D-044).
+
 - [x] v2.3: agent plan (temporary intentions, Up next, mute/pause, re-evaluation) (D-043)
 
 - [x] v2.1: voice calls (Gemini Live), Telegram photo/voice fix, dashboard KPIs and source health, update status UI, generic re-audit (D-038…D-041)
@@ -50,7 +52,6 @@ Priority: P0 (blocks real use) · P1 (high value) · P2 (later). Status: TODO ·
 
 ## TODO
 
-- [ ] **P1** Android + iPhone (plan in `docs/mobile/TASKS.md`, MP-0…MP-22). Waiting on the user's decisions in Phase 0: host, Apple Developer Program, Firebase.
 
 - [ ] **P0** On the real phone: allow "full-screen calls" (Setup) and take one real coach call. Check the earpiece/speaker audio and the echo cancellation on ColorOS.
 - [ ] **P1** Only one device can poll the Telegram bot: the emulator got 409 Conflict while the phone was polling. Fine in real use; tests must stop the phone's polling or use another bot.

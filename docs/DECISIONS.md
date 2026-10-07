@@ -308,8 +308,9 @@ Memory items must be grounded in the user's words, like food items. Every reply 
 - no `material-icons` dependency (it is not in the current Compose BOM);
 - the dashboard engine now exposes numbers (`DashboardData.Headline`, `Source.ageMinutes`), so the UI draws rings and status dots from data instead of parsing text.
 
-### D-044 — Android + iPhone: agent moves to a backend; KMP + Compose Multiplatform clients (planned)
-**Decision (not yet implemented).** See `docs/mobile/DECISIONS.md` (M-001…M-007).
+### D-044 — Android + iPhone: researched, then dropped
+**Status: dropped (2026-10-07).** The user chose to stay Android-only, so the on-device agent (D-027, no server) remains the architecture. The research is kept for reference.
+**What the research found.** See `docs/mobile/DECISIONS.md` (M-001…M-007).
 - iOS cannot host the agent loop, so the agent, memory, plan, Telegram and push sending move to a Kotlin backend that reuses the engine.
 - Both apps become clients with shared Kotlin logic and UI, plus native push, call, audio, health and location layers.
-- This will supersede D-027 ("no server") once it ships.
+- It would have superseded D-027 ("no server").
