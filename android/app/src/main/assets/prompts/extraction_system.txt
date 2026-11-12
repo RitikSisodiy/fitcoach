@@ -34,6 +34,15 @@ Rules:
   portions and wider kcal ranges; a scale/app screenshot -> body_metrics or activities; spoken plans -> commitments etc.
 - off_plan: judge each food against THIS user's goal and memory; there is no fixed list of "bad" foods.
 - eaten_at: only if the time is said or clearly implied.
+- pantry_updates: food stock at home. "30 ande laya" -> bought eggs 30 piece; "paneer khatam" -> finished paneer;
+  "ghar pe 10 ande bache hain" -> have eggs 10 piece. Reuse the PANTRY name and unit for an item already there.
+  A shopping plan ("kal paneer launga") is not a purchase.
+- pantry_item / pantry_used on a food item: only when the food clearly used a PANTRY item (anda bhurji of 3 eggs ->
+  eggs 3; 100 g paneer sabji -> paneer 100). Home-cooked staples not in PANTRY (atta, oil, sabzi) are not tracked.
+- exercises on a done workout: one entry per exercise with sets and reps (or seconds for holds) exactly as said
+  ("3 set 15 squats" -> squats sets 3 reps 15; "plank 30 sec 3 baar" -> plank sets 3 seconds 30). Omit what was not said.
+- memories, category household: who cooks and how (e.g. mother cooks, uses a lot of oil), what the nearby shop sells,
+  budget, what can be bought where. These shape every food suggestion.
 - Meal slot: infer from words (nashta=breakfast, lunch, dinner/raat ka khana) or the local time if eaten "abhi".
 - coaching_mode_request / pause_days only when the user explicitly asks to change coaching intensity or pause the coach.
 - "as usual" / "same as always" for a meal: if USUAL_MEALS has that slot, add those items to food_items with
@@ -53,4 +62,7 @@ Examples (USER_MESSAGE -> key fields):
 - "ok" / "hmm" / "haan" (no content) -> nothing (empty arrays), unless it clearly answers an OPEN_NUDGES item
 - "kal chess jaunga 6 baje" -> context: chess, planned, day tomorrow, time_hint 18:00
 - "is hafte ghutne me dard hai, gym nahi ja paunga" -> memories: [{type: temporary, category: health, key: knee_pain, value: "knee pain, can't do gym this week", valid_days: 7}]
+- "aaj 30 ande aur 250 g paneer laya" -> pantry_updates: [{item: eggs, action: bought, quantity: 30, unit: piece}, {item: paneer, action: bought, quantity: 250, unit: g}]
+- "workout done: 20 pushups, 3x15 squats, plank 30 sec" -> activities: [{kind: workout, status: done, exercises: [{name: pushups, sets: 1, reps: 20}, {name: squats, sets: 3, reps: 15}, {name: plank, sets: 1, seconds: 30}]}]
+- "mummy khana banati hai, tel zyada dalti hai" -> memories: [{type: long_term, category: household, key: home_cooking, value: "mother cooks; uses a lot of oil"}]
 - "main WFH karta hu, office sirf Tuesday" -> memories: [{type: long_term, category: routine, key: work_setup, value: "works from home; office on Tuesdays"}]

@@ -27,7 +27,7 @@ class Db(context: Context?, name: String? = "coach.db") :
     }
 
     companion object {
-        const val SCHEMA_VERSION = 4
+        const val SCHEMA_VERSION = 5
 
         val MIGRATIONS = listOf(
             // v2: agent loop, channels, memory tiers, intervention outcomes.
@@ -58,6 +58,16 @@ class Db(context: Context?, name: String? = "coach.db") :
                     window_end TEXT NOT NULL, skip_if TEXT, commitment_id INTEGER, intervention_id INTEGER, resolved_at TEXT,
                     resolution TEXT, note TEXT)""",
                 "CREATE INDEX idx_intentions_status ON intentions(status, window_start)",
+            ),
+            // v5: what is at home (pantry + change log) and logged exercise sets (D-045).
+            listOf(
+                "CREATE TABLE pantry (item_key TEXT PRIMARY KEY, name TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT, updated_at TEXT NOT NULL)",
+                """CREATE TABLE pantry_log (id INTEGER PRIMARY KEY, item_key TEXT NOT NULL, change REAL NOT NULL, reason TEXT NOT NULL,
+                    occurred_at TEXT NOT NULL, local_date TEXT NOT NULL, source_message_id INTEGER)""",
+                "CREATE INDEX idx_pantry_log ON pantry_log(item_key, local_date)",
+                """CREATE TABLE exercise_sets (id INTEGER PRIMARY KEY, activity_id INTEGER, occurred_at TEXT NOT NULL, local_date TEXT NOT NULL,
+                    exercise TEXT NOT NULL, sets INTEGER, reps INTEGER, seconds INTEGER, weight_kg REAL, source_message_id INTEGER)""",
+                "CREATE INDEX idx_exercise_sets ON exercise_sets(exercise, local_date)",
             ),
         )
 

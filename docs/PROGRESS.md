@@ -2,6 +2,22 @@
 
 Newest first. One dated block per session: what changed, how it was verified, and what's next.
 
+## 2026-11-12 (v2.4: pantry, next meal, grocery list, workout progression, household context)
+- Changes (D-045):
+  - DB v5: `pantry`, `pantry_log`, `exercise_sets`.
+  - Extraction: `pantry_updates`, `pantry_item`/`pantry_used` on foods, `exercises` on workouts, memory category `household`.
+  - `engine/Household.kt`: `nutrition_today`, `pantry` (days left from real use) and `training` facts in every reply
+    context and agent SITUATION; prompts tell the agent how to use them.
+  - Dashboard: "At home & training" card.
+- Verified:
+  - Unit tests: 13 engine + 31 service, all green (new: validator, pantry use/days left/unit mismatch, training history,
+    protein gap, v5 migration).
+  - `LiveHouseholdTest` (real Gemini): purchases became stock, 3 eggs eaten -> 27 left, sets logged, household memory
+    saved; the coach answered "~80 g protein left" with dishes from the pantry, and set tomorrow's workout as a small
+    step up from the logged one. The agent stayed silent at 13:00 because the user had just been messaged.
+  - `lintVitalRelease assembleRelease`.
+- Next: a real week on the phone; watch whether the agent sends the grocery list at a useful time.
+
 ## Current state (2026-10-07, v2.1)
 - **v2.1:**
   - **Voice calls:** the agent decides when to call. Calls use Gemini Live (`gemini-3.8-live`, with a fallback model).

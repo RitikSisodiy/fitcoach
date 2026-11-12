@@ -308,6 +308,23 @@ Memory items must be grounded in the user's words, like food items. Every reply 
 - no `material-icons` dependency (it is not in the current Compose BOM);
 - the dashboard engine now exposes numbers (`DashboardData.Headline`, `Source.ageMinutes`), so the UI draws rings and status dots from data instead of parsing text.
 
+### D-045 — Pantry, protein gap and training history are facts; the agent plans meals, groceries and workouts
+**Status: accepted (2026-11-12).** The user asked for next-meal suggestions, a grocery list, workout progression and
+advice that fits their home (mother cooks with a lot of oil, the nearby shop sells only chai/maggi/cold drinks), and
+explicitly no static plans.
+**Decision.** Code only stores and counts; the LLM decides.
+- `pantry` + `pantry_log` (v5): extraction reports purchases, "how much is left" and "finished"; a food item can name the
+  PANTRY item it used. Code never adds up different units (it asks instead) and never goes below zero.
+- `exercise_sets` (v5): sets x reps / seconds / kg per exercise from a reported workout.
+- `engine/Household.kt` turns these into facts for every reply and decision: `nutrition_today` (protein eaten vs target,
+  or a labelled 1.6-2.0 g/kg reference when no target is set), `pantry` (left, last bought, used per day, days left after
+  2+ days of use) and `training` (last 4 sessions per exercise, days since last).
+- Memory category `household` holds who cooks and how, what can be bought nearby and budget.
+- The agent and reply prompts say how to use the facts: suggest dishes from what is at home for the coming meal, one
+  grocery list when items run low, the next workout target from logged history. No meal plan, list or target is fixed in code.
+**Why:** it follows the project rule "give the agent the fact instead" (no templates, no fixed windows), and the numbers
+the coach quotes still come from code.
+
 ### D-044 — Android + iPhone: researched, then dropped
 **Status: dropped (2026-10-07).** The user chose to stay Android-only, so the on-device agent (D-027, no server) remains the architecture. The research is kept for reference.
 **What the research found.** See `docs/mobile/DECISIONS.md` (M-001…M-007).

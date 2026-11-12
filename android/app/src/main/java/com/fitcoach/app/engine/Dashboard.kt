@@ -46,6 +46,9 @@ data class DashboardData(
     /** The agent's open intentions (next 24 h) and what happened to recent ones. */
     val plan: List<PlanItem> = emptyList(),
     val planHistory: List<PlanItem> = emptyList(),
+    /** "eggs: 12 piece · ~3 days left" and "squats: 2026-11-12: 3x15" lines from the facts the agent sees. */
+    val pantry: List<String> = emptyList(),
+    val training: List<String> = emptyList(),
 ) {
     /** [status]: planned, due, muted, done, cancelled, expired. [eta]: "in 40 min", "due now"... */
     data class PlanItem(
@@ -152,6 +155,9 @@ object Dashboard {
             headline = headline(service, now, days14, kcal14, commitments),
             plan = service.plan.open().map { planItem(service, now, it) },
             planHistory = service.plan.recent(now, 24).take(8).map { planItem(service, now, it) },
+            pantry = list(ctx.getJSONArray("pantry")) { p -> "${p.optString("item")}: ${p.optString("left")}" + (p.opt("days_left")?.let { " · ~$it days left" } ?: "") },
+            training = ctx.getJSONObject("training").let { o -> o.keys().asSequence().map { k ->
+                "$k: ${o.getJSONObject(k).getJSONArray("last_sessions").let { a -> a.getString(a.length() - 1) }}" }.toList() },
             quota = service.llm.usage().filterValues { !it.startsWith("0/") }.entries.joinToString { "${it.key} ${it.value}" }.ifEmpty { "unused today" },
         )
     }

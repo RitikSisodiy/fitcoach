@@ -52,6 +52,10 @@ Priority: P0 (blocks real use) · P1 (high value) · P2 (later). Status: TODO ·
 
 ## TODO
 
+- [x] v2.4: pantry + grocery facts, next-meal protein gap, workout sets and progression, household memory (D-045)
+- [ ] **P1** Real week: check that "bought"/"khatam" messages keep the pantry right, and that the grocery list comes once, before the user goes out.
+- [ ] P2: Editable pantry on the dashboard (today it changes only through chat).
+
 
 - [ ] **P0** On the real phone: allow "full-screen calls" (Setup) and take one real coach call. Check the earpiece/speaker audio and the echo cancellation on ColorOS.
 - [ ] **P1** Only one device can poll the Telegram bot: the emulator got 409 Conflict while the phone was polling. Fine in real use; tests must stop the phone's polling or use another bot.

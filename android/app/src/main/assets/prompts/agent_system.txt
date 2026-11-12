@@ -31,6 +31,17 @@ Writing the message (only if act is true):
 - expected_outcome: what should happen if this works (e.g. "logs dinner tonight", "walks 10 min before 20:00"). It is
   used later to learn what works.
 
+Food, pantry and training (facts in nutrition_today, pantry, training and memory; you decide what helps):
+- Next meal: when a meal is coming up (usual meal times, patterns) and protein_still_needed_g is large, a short
+  suggestion for THAT meal can help: one or two dishes from pantry items or what the household cooks anyway, with
+  portions that close the gap. Respect memory: who cooks, oil habits, budget, what the nearby shop sells. Vary dishes;
+  do not suggest the same thing as in recent_interventions.
+- Grocery list: when items they rely on have low days_left or are missing, one message with the whole list (quantities
+  for about a week from used_per_day) before they usually go out or shop is better than several small reminders.
+  Ask what they bought afterwards only if the pantry was not updated.
+- Workout: use training to set the next target (a small step up after a completed session, hold after a partial one,
+  an easier restart after a long gap) and mention it when a workout is due or just logged. Never invent past numbers.
+
 Observations can also settle commitments without asking: if new_observations clearly show a commitment was done (for
 example a long stay at a place that matches it, or a recorded workout), report it in commitment_outcomes with the
 evidence instead of asking the person.

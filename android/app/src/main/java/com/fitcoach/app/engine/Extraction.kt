@@ -20,9 +20,18 @@ data class ExtractedFood(
     val name: String, val quantity: Double?, val unit: String?, val mealSlot: String, val eaten: Boolean,
     val estKcal: Pair<Double?, Double?>, val estProtein: Pair<Double?, Double?>, val confidence: Double,
     val offPlan: Boolean = false, val eatenAt: String? = null,
+    /** The PANTRY item this food used up, and how much of it in that item's unit. */
+    val pantryItem: String? = null, val pantryUsed: Double? = null,
 )
 
-data class ExtractedActivity(val kind: String, val description: String, val durationMin: Double?, val steps: Int?, val confidence: Double)
+/** One logged exercise: [sets] of [reps] or of [seconds] (a hold), optionally with [weightKg]. */
+data class ExerciseSet(val name: String, val sets: Int?, val reps: Int?, val seconds: Int?, val weightKg: Double?)
+data class ExtractedActivity(
+    val kind: String, val description: String, val durationMin: Double?, val steps: Int?, val confidence: Double,
+    val exercises: List<ExerciseSet> = emptyList(),
+)
+/** Stock at home: bought (add), have (the quantity left now) or finished (none left). */
+data class PantryUpdate(val item: String, val quantity: Double?, val unit: String?, val action: String)
 data class ExtractedContext(val tag: String, val timing: String, val timeHint: String?, val tomorrow: Boolean, val description: String)
 data class ExtractedCommitment(
     val kind: String, val title: String, var triggerTag: String?, val action: String, val versions: List<String>,
@@ -49,6 +58,7 @@ class Extraction {
     val foodCorrections = mutableListOf<FoodCorrection>()
     val commitmentChanges = mutableListOf<MutableMap<String, Any?>>()
     val inferredConfirmations = mutableListOf<InferredConfirmation>()
+    val pantryUpdates = mutableListOf<PantryUpdate>()
     val profileUpdates = mutableMapOf<String, Any?>()
     val patternFeedback = mutableListOf<Pair<Long, Boolean>>()
     val dataNeeded = mutableListOf<DataQuery>()
@@ -63,7 +73,10 @@ class Extraction {
 
     fun summary(): JSONObject = JSONObject()
         .put("foods", JSONArray(foods.map { it.name }))
-        .put("activities", JSONArray(activities.map { it.kind }))
+        .put("activities", JSONArray(activities.map { a ->
+            a.kind + a.exercises.joinToString(", ", " (", ")") { "${it.name} ${it.sets ?: 1}x${it.reps ?: "${it.seconds}s"}" }.takeIf { a.exercises.isNotEmpty() }.orEmpty()
+        }))
+        .put("pantry_updates", JSONArray(pantryUpdates.map { "${it.action} ${it.item} ${it.quantity ?: ""} ${it.unit ?: ""}".trim() }))
         .put("body_metrics", JSONArray(bodyMetrics.map { "${it.first}=${it.second}" }))
         .put("context", JSONArray(context.map { it.tag }))
         .put("commitments", JSONArray(commitments.map { it.title }))
@@ -79,7 +92,7 @@ class Extraction {
 object ExtractionValidator {
     const val MIN_CONFIDENCE = 0.35
     val REASONS = setOf("cannot", "forgot", "dont_want", "too_hard", "bad_timing", "unknown")
-    val FACT_CATEGORIES = setOf("preference", "constraint", "routine", "schedule", "goal", "health", "life_event", "other")
+    val FACT_CATEGORIES = setOf("preference", "constraint", "routine", "schedule", "goal", "health", "life_event", "household", "other")
     val COMMITMENT_KINDS = setOf("if_then", "habit", "precommitment", "boundary")
     private val TOKEN = Regex("[a-z0-9]+(?:\\.[0-9]+)?")
 
@@ -139,8 +152,10 @@ object ExtractionValidator {
             if (kl != null && kh != null && kl > kh) { val t = kl; kl = kh; kh = t }
             var pl = item.numOrNull("est_protein_low"); var ph = item.numOrNull("est_protein_high")
             if (pl != null && ph != null && pl > ph) { val t = pl; pl = ph; ph = t }
+            val pantryUsed = item.numOrNull("pantry_used")?.takeIf { it > 0 && it <= 5000 }
             out.foods += ExtractedFood(name.take(80), qty, unit, item.strOrNull("meal_slot") ?: "unknown",
-                item.strOrNull("eaten") != "planned", kl to kh, pl to ph, c, item.boolOr("off_plan"), hhmm(item.strOrNull("eaten_at")))
+                item.strOrNull("eaten") != "planned", kl to kh, pl to ph, c, item.boolOr("off_plan"), hhmm(item.strOrNull("eaten_at")),
+                item.strOrNull("pantry_item")?.trim()?.take(60)?.takeIf { pantryUsed != null }, pantryUsed)
         }
 
         for (a in raw.arr("activities").objects()) {
@@ -150,7 +165,25 @@ object ExtractionValidator {
             val d = a.numOrNull("duration_min")?.takeIf { it > 0 && it <= 600 }
             val s = a.numOrNull("steps")?.takeIf { it > 0 && it <= 80000 }
             val kind = a.strOrNull("kind").takeIf { it in setOf("walk", "workout", "sport", "steps", "other") } ?: "other"
-            out.activities += ExtractedActivity(kind, (a.strOrNull("description") ?: "").take(120), d, s?.toInt(), c)
+            val exercises = a.arr("exercises").objects().mapNotNull { e ->
+                val n = e.strOrNull("name")?.trim()?.lowercase()?.take(40) ?: return@mapNotNull null
+                val reps = e.numOrNull("reps")?.takeIf { it >= 1 && it <= 500 }?.roundToInt()
+                val secs = e.numOrNull("seconds")?.takeIf { it >= 1 && it <= 3600 }?.roundToInt()
+                if (reps == null && secs == null) { out.dropped += "exercise '$n' without reps or seconds"; return@mapNotNull null }
+                ExerciseSet(n, e.numOrNull("sets")?.takeIf { it >= 1 && it <= 20 }?.roundToInt(), reps, if (reps == null) secs else null,
+                    e.numOrNull("weight_kg")?.takeIf { it > 0 && it <= 300 })
+            }.take(12)
+            out.activities += ExtractedActivity(kind, (a.strOrNull("description") ?: "").take(120), d, s?.toInt(), c, exercises)
+        }
+
+        for (p in raw.arr("pantry_updates").objects()) {
+            val item = p.strOrNull("item")?.trim()?.take(60) ?: continue
+            if (!check(p, "pantry '$item'")) continue
+            val action = p.strOrNull("action").takeIf { it in setOf("bought", "have", "finished") } ?: continue
+            val q = p.numOrNull("quantity")?.takeIf { it >= 0 && it <= 10000 }
+            if (action != "finished" && q == null) { out.dropped += "pantry '$item' without a quantity"; continue }
+            if (action == "bought" && q == 0.0) continue
+            out.pantryUpdates += PantryUpdate(item, if (action == "finished") 0.0 else q, p.strOrNull("unit")?.trim()?.lowercase()?.take(20), action)
         }
 
         for (m in raw.arr("body_metrics").objects()) {

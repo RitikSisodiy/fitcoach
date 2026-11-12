@@ -142,6 +142,12 @@ fun DashboardScreen(app: FitCoachApp) {
                 }
             }
         }
+        if (d.pantry.isNotEmpty() || d.training.isNotEmpty()) item {
+            FcCard(title = "At home & training") {
+                if (d.pantry.isNotEmpty()) { Sub("At home"); d.pantry.forEach { Bullet(it, Fc.Orange) } }
+                if (d.training.isNotEmpty()) { Sub("Last workout"); d.training.forEach { Bullet(it, Fc.Accent) } }
+            }
+        }
         item { BrainCard(d) }
         item { ActivityCard(d) }
         item { SourcesCard(d, access) { Scheduler.runNow(ctx) } }

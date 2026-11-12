@@ -107,6 +107,9 @@ class CoachService(
                 .put("weekly_rate_pct", trend.weeklyRatePct).put("status", trend.status).put("notes", JSONArray(trend.notes)))
             .put("health_connect", hc)
             .put("meal_coverage_today", Habits.dayCoverage(store, today).asJson())
+            .put("nutrition_today", Meals.today(totals, profile, trend.latestTrend ?: trend.latestRaw))
+            .put("pantry", Pantry.context(store, today))
+            .put("training", Training.context(store, today))
             .put("pending_inferred_events", JSONArray(store.pendingInferred(TimeUtil.daysAgo(today, 1)).take(5).map { it.str("summary") }))
             .put("observed_patterns", JSONArray(store.patterns("active").take(8).map { JSONObject().put("id", it.long("id")).put("claim", it.str("claim")) }))
             .put("places_today", JSONArray(store.contextSince(today).filter { it.str("source") == "geofence" }.map { "${it.str("tag")} ${it.str("time_hint") ?: ""}".trim() }))
@@ -228,6 +231,8 @@ class CoachService(
                 JSONObject().put("item", it.str("item_name")).put("quantity", it.dbl("quantity")).put("unit", it.str("unit")).put("meal", it.str("meal_slot"))
             }))
             .put("USUAL_MEALS", profile.optJSONObject("usual_meals") ?: JSONObject())
+            .put("PANTRY", JSONArray(store.pantry().map { "${it.str("name")}: ${Pantry.fmt(it.dbl("quantity"))} ${it.str("unit") ?: ""}".trim() }))
+            .put("KNOWN_EXERCISES", JSONArray(store.query("SELECT DISTINCT exercise FROM exercise_sets ORDER BY exercise").mapNotNull { it.str("exercise") }))
             .put("GOAL", JSONObject().put("goal", profile.opt("goal_text")).put("goal_weight_kg", profile.opt("goal_weight_kg")))
             .put("ACTIVE_MEMORY", JSONArray(store.activeFacts(now).filter { it.str("category") != "coach_insight" }.map {
                 JSONObject().put("key", it.str("key")).put("value", it.str("value")).put("temporary", it.str("valid_until") != null)
@@ -274,13 +279,23 @@ class CoachService(
                 "confidence" to est.confidence, "source_message_id" to mid, "off_plan" to f.offPlan,
             ))
             if (est.kcalLow == null) unknown += f.name
+            if (f.pantryItem != null && f.pantryUsed != null) {
+                val item = store.pantryItem(f.pantryItem)
+                if (item != null) store.changePantry(now, item.str("name")!!, null, -f.pantryUsed, "used", mid)
+            }
         }
         if (unknown.isNotEmpty()) guidance += "Could not estimate nutrition for: ${unknown.joinToString(", ")}. Say so honestly; don't guess."
 
         ex.activities.forEach { a ->
-            store.addActivity(now, now, mapOf("kind" to a.kind, "duration_min" to a.durationMin, "steps" to a.steps, "source" to "user_reported",
+            val aid = store.addActivity(now, now, mapOf("kind" to a.kind, "duration_min" to a.durationMin, "steps" to a.steps, "source" to "user_reported",
                 "confidence" to a.confidence, "source_message_id" to mid))
+            a.exercises.forEach { e ->
+                store.addExerciseSets(now, aid, mapOf("exercise" to e.name, "sets" to (e.sets ?: 1), "reps" to e.reps, "seconds" to e.seconds,
+                    "weight_kg" to e.weightKg), mid)
+            }
+            if (a.exercises.isNotEmpty()) guidance += "Workout sets logged. Compare with context.training (code-computed history) before praising or setting the next target."
         }
+        ex.pantryUpdates.forEach { p -> guidance += applyPantry(now, p, mid) }
         ex.bodyMetrics.forEach { (metric, value) ->
             store.addMetric(now, now, metric, value, "user_reported")
             if (metric == "weight_kg") guidance += "Weight logged. Comment on the TREND (context.weight), not this single reading; daily swings of 1-2 kg are water/food, not fat."
@@ -367,6 +382,21 @@ class CoachService(
             guidance += "Coaching mode is now $m, as the user asked."
         }
         return guidance
+    }
+
+    /** Data integrity: a quantity in another unit than the stored one can't be added up, so the reply asks instead of guessing. */
+    private fun applyPantry(now: Instant, p: PantryUpdate, mid: Long): String {
+        val row = store.pantryItem(p.item)
+        val stored = row?.str("unit")
+        if (stored != null && p.unit != null && p.unit != stored && p.action != "finished")
+            return "Pantry not updated for ${p.item}: said in ${p.unit}, stored in $stored. Ask how much that is in $stored."
+        val name = row?.str("name") ?: p.item
+        val q = p.quantity ?: 0.0
+        val left = when (p.action) {
+            "bought" -> store.changePantry(now, name, p.unit, q, "bought", mid)
+            else -> store.changePantry(now, name, p.unit, 0.0, p.action, mid, setTo = q)
+        }
+        return "Pantry: $name now ${Pantry.fmt(left)} ${p.unit ?: stored ?: ""}".trim() + "."
     }
 
     private fun outcomeGuidance(u: CommitmentUpdate): String =

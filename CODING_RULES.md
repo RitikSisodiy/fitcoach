@@ -79,3 +79,4 @@ Update it when you learn something reusable (add it under "Lessons"). Keep it sh
 - Run `lintVitalRelease assembleRelease` locally before pushing new Activities or dependencies. CI's release lint rejected `registerForActivityResult` in a plain `ComponentActivity`, because an old Fragment comes in transitively. Debug builds don't run that check.
 - Agent intentions must never fire on their own. A planned time only wakes the LLM, which decides again with fresh context. Otherwise stale plans message people about things they already did.
 - User controls (mute, pause) are enforced in code, not only in the prompt. The LLM will "helpfully" cancel or work around them.
+- Quantities the LLM reports in another unit than the stored one are never added up. Store the fact, ask for the conversion (pantry).

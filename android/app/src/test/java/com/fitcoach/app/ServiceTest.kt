@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.fitcoach.app.data.Db
 import com.fitcoach.app.data.Store
+import com.fitcoach.app.data.dbl
 import com.fitcoach.app.data.long
 import com.fitcoach.app.data.str
 import com.fitcoach.app.engine.Coach
@@ -238,6 +239,7 @@ class ServiceTest {
         assertTrue(s.addObservation(Instant.now(), "x", "y") > 0)
         assertTrue(s.insert("calls", mapOf("status" to "ringing", "rang_at" to "2026-10-01T10:00:00Z")) > 0) // v3
         assertEquals(0L, s.one("SELECT COUNT(*) AS n FROM food_events WHERE off_plan = 1")!!.long("n"))
+        assertEquals(5.0, s.changePantry(Instant.now(), "eggs", "piece", 5.0, "bought"), 0.0) // v5
         db.close()
     }
 
@@ -396,6 +398,59 @@ class ServiceTest {
         service.tick(at("2026-10-06", "20:00"))
         assertEquals("done", store.commitmentOutcome(cid, "2026-10-06"))
         assertTrue(store.recentDecisions(5).any { it.str("kind") == "agent_inferred_outcome" })
+    }
+
+    // ------------------------------------------------- pantry, meals, training (D-045)
+    private fun eggs(qty: Int) = """{"food_items":[{"name":"anda bhurji","quote":"$qty ande ki bhurji","quantity":$qty,"unit":"piece",
+        "meal_slot":"breakfast","eaten":"eaten","confidence":0.9,"pantry_item":"Eggs","pantry_used":$qty}]}"""
+
+    @Test fun pantryTracksBoughtUsedAndDaysLeft() = runTest {
+        llm.extraction = """{"pantry_updates":[{"item":"eggs","action":"bought","quantity":30,"unit":"piece","quote":"30 ande laya"}]}"""
+        service.handleMessage(Inbound("30 ande laya", at("2026-10-05", "12:00")))
+        llm.extraction = eggs(3)
+        service.handleMessage(Inbound("3 ande ki bhurji khayi", at("2026-10-05", "19:00")))
+        service.handleMessage(Inbound("3 ande ki bhurji khayi", at("2026-10-06", "11:00")))
+        assertEquals(24.0, store.pantryItem("eggs")!!.dbl("quantity")!!, 0.0)
+        val p = service.buildContext(at("2026-10-06", "12:00")).getJSONArray("pantry").getJSONObject(0)
+        assertEquals("24 piece", p.getString("left"))
+        assertEquals("2026-10-05", p.getString("last_bought"))
+        assertEquals("3", p.getString("used_per_day"))
+        assertEquals("8", p.getString("days_left"))
+        llm.extraction = """{"pantry_updates":[{"item":"eggs","action":"have","quantity":1,"unit":"tray","quote":"1 tray bacha"}]}"""
+        service.handleMessage(Inbound("1 tray bacha hai", at("2026-10-06", "13:00")))
+        assertEquals(24.0, store.pantryItem("eggs")!!.dbl("quantity")!!, 0.0) // another unit is never added up
+        assertTrue(llm.lastReplyPrompt.contains("stored in piece"))
+        service.tick(at("2026-10-06", "14:00"))
+        assertTrue(llm.lastDecidePrompt.contains("\"days_left\""))
+    }
+
+    @Test fun workoutSetsBecomeTrainingHistory() = runTest {
+        llm.extraction = """{"activities":[{"kind":"workout","status":"done","confidence":0.9,"exercises":[
+            {"name":"squats","sets":3,"reps":15},{"name":"plank","sets":3,"seconds":30}]}]}"""
+        service.handleMessage(Inbound("workout done 3x15 squats, plank 30 sec 3 baar", at("2026-10-03", "10:30")))
+        llm.extraction = """{"activities":[{"kind":"workout","status":"done","confidence":0.9,"exercises":[{"name":"squats","sets":3,"reps":18}]}]}"""
+        service.handleMessage(Inbound("aaj 3x18 squats", at("2026-10-05", "10:30")))
+        val t = service.buildContext(at("2026-10-06", "10:00")).getJSONObject("training")
+        assertEquals("2026-10-05: 3x18", t.getJSONObject("squats").getJSONArray("last_sessions").getString(1))
+        assertEquals(1, t.getJSONObject("squats").getInt("days_since_last"))
+        assertEquals("2026-10-03: 3x30s", t.getJSONObject("plank").getJSONArray("last_sessions").getString(0))
+        assertTrue(llm.lastReplyPrompt.contains("Workout sets logged"))
+        assertEquals(listOf("plank: 2026-10-03: 3x30s", "squats: 2026-10-05: 3x18"), Dashboard.build(service, at("2026-10-06", "10:00")).training.sorted())
+    }
+
+    @Test fun nutritionTodayGivesTheProteinGap() = runTest {
+        store.addMetric(Instant.now(), at("2026-10-06", "08:00"), "weight_kg", 65.0, "user_reported")
+        llm.extraction = eggs(3)
+        service.handleMessage(Inbound("3 ande ki bhurji khayi", at("2026-10-06", "10:30")))
+        val n = service.buildContext(at("2026-10-06", "11:00")).getJSONObject("nutrition_today")
+        assertEquals("[104,130]", n.getJSONArray("protein_reference_g").toString())
+        val eaten = n.getJSONArray("protein_eaten_g").let { (it.getInt(0) + it.getInt(1)) / 2.0 }
+        assertTrue(eaten > 0)
+        assertEquals(104 - eaten, n.getDouble("protein_still_needed_g"), 1.0)
+        store.setProfile(Instant.now(), "protein_target_g", 110)
+        assertTrue(service.buildContext(at("2026-10-06", "11:00")).getJSONObject("nutrition_today").has("protein_target_g"))
+        service.tick(at("2026-10-06", "12:00"))
+        assertTrue(llm.lastDecidePrompt.contains("protein_still_needed_g"))
     }
 
     @Test fun dashboardKpisAndSourcesComeFromData() = runTest {

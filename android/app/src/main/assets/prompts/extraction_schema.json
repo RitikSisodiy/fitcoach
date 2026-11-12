@@ -63,6 +63,14 @@
      "eaten_at": {
       "type": "string",
       "description": "HH:MM 24h when it was eaten, if said or clearly implied (e.g. 'subah' with the usual breakfast time from ACTIVE_MEMORY); omit if unknown"
+     },
+     "pantry_item": {
+      "type": "string",
+      "description": "If this food used up something listed in PANTRY, that item's name exactly as in PANTRY (e.g. 3 ande ki bhurji -> eggs). Omit otherwise."
+     },
+     "pantry_used": {
+      "type": "number",
+      "description": "How much of pantry_item it used, in that PANTRY item's unit (3 eggs -> 3; 100 g paneer -> 100 if the unit is g)"
      }
     },
     "required": [
@@ -105,6 +113,36 @@
      },
      "confidence": {
       "type": "number"
+     },
+     "exercises": {
+      "type": "array",
+      "description": "Strength/bodyweight exercises the user reports doing, one entry per exercise",
+      "items": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string",
+         "description": "short English name, reuse a name from KNOWN_EXERCISES when it is the same exercise (pushups, squats, lunges, plank)"
+        },
+        "sets": {
+         "type": "number"
+        },
+        "reps": {
+         "type": "number",
+         "description": "reps per set"
+        },
+        "seconds": {
+         "type": "number",
+         "description": "for holds like plank: seconds per set"
+        },
+        "weight_kg": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "name"
+       ]
+      }
      }
     },
     "required": [
@@ -548,6 +586,7 @@
        "goal",
        "health",
        "life_event",
+       "household",
        "other"
       ]
      },
@@ -582,6 +621,43 @@
   "media_summary": {
    "type": "string",
    "description": "Only when media is attached. Voice note: verbatim transcript in the user's own language/script. Photo: what it shows that matters to the coach (foods with visible portions, a scale or app screenshot reading, a workout, a menu, a receipt), in one or two sentences."
+  },
+  "pantry_updates": {
+   "type": "array",
+   "description": "Food stock at home the user reports: bought, how much is left, or finished.",
+   "items": {
+    "type": "object",
+    "properties": {
+     "item": {
+      "type": "string",
+      "description": "simple English name, singular category (eggs, paneer, soya chunks, roasted chana, milk); reuse the PANTRY name when it is the same item"
+     },
+     "action": {
+      "type": "string",
+      "enum": [
+       "bought",
+       "have",
+       "finished"
+      ]
+     },
+     "quantity": {
+      "type": "number",
+      "description": "bought: amount added; have: amount left now. Convert to the PANTRY item's unit when it exists (1 tray eggs = 30 piece)."
+     },
+     "unit": {
+      "type": "string",
+      "description": "piece, g, ml or packet; same as the PANTRY item's unit when it exists"
+     },
+     "quote": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "item",
+     "action",
+     "quote"
+    ]
+   }
   }
  },
  "required": [

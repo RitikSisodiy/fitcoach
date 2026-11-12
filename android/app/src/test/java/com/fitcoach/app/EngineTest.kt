@@ -37,6 +37,24 @@ class EngineTest {
         assertTrue(ex.dropped.any { "paneer" in it })
     }
 
+    @Test fun pantryAndExercisesAreValidated() {
+        val raw = JSONObject("""{"pantry_updates":[
+            {"item":"eggs","action":"bought","quantity":30,"unit":"Piece","quote":"30 ande laya"},
+            {"item":"paneer","action":"bought","quote":"paneer laya"},
+            {"item":"soya chunks","action":"finished","quote":"soya khatam"},
+            {"item":"milk","action":"bought","quantity":2,"unit":"l","quote":"doodh ki 2 thaili"}],
+            "activities":[{"kind":"workout","status":"done","confidence":0.9,"exercises":[
+            {"name":"Squats","sets":3,"reps":15},{"name":"plank","sets":3,"seconds":30},{"name":"pushups"}]}]}""")
+        val ex = ExtractionValidator.validate(raw, emptySet(), "aaj 30 ande laya, paneer laya, soya khatam. 3x15 squats, plank 30 sec 3 baar")
+        assertEquals(listOf("eggs:30.0:piece", "soya chunks:0.0:finished"), ex.pantryUpdates.map { "${it.item}:${it.quantity}:${if (it.action == "finished") it.action else it.unit}" })
+        assertTrue(ex.dropped.any { "paneer" in it && "quantity" in it }) // bought without an amount
+        assertTrue(ex.dropped.any { "milk" in it }) // not grounded
+        val sets = ex.activities.single().exercises
+        assertEquals(listOf("squats", "plank"), sets.map { it.name })
+        assertEquals(30, sets[1].seconds); assertNull(sets[1].reps)
+        assertTrue(ex.dropped.any { "pushups" in it })
+    }
+
     @Test fun tokenizerKeepsWordsBeforeFullStop() {
         assertTrue(ExtractionValidator.grounded("dal sabzi", "2 roti dal sabzi."))
     }

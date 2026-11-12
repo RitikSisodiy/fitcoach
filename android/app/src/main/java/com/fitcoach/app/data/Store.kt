@@ -228,6 +228,35 @@ class Store(val db: SQLiteDatabase, val tz: ZoneId) {
 
     fun activitiesOn(day: String): List<Row> = query("SELECT * FROM activity_events WHERE local_date = ? ORDER BY occurred_at", day)
 
+    fun addExerciseSets(now: Instant, activityId: Long?, values: Map<String, Any?>, msgId: Long?): Long =
+        insert("exercise_sets", values + mapOf("activity_id" to activityId, "occurred_at" to TimeUtil.iso(now), "local_date" to date(now),
+            "source_message_id" to msgId))
+
+    fun exerciseSetsSince(day: String): List<Row> = query("SELECT * FROM exercise_sets WHERE local_date >= ? ORDER BY occurred_at, id", day)
+
+    // --------------------------------------------------------------- pantry
+    fun pantry(): List<Row> = query("SELECT * FROM pantry ORDER BY name")
+
+    fun pantryItem(name: String): Row? = one("SELECT * FROM pantry WHERE item_key = ?", normalizeTag(name))
+
+    /**
+     * Changes the stock of one item and logs why. [setTo] replaces the quantity (the person said how much is left),
+     * otherwise [delta] is added. Stock never goes below zero. Returns the new quantity.
+     */
+    fun changePantry(now: Instant, name: String, unit: String?, delta: Double, reason: String, msgId: Long? = null, setTo: Double? = null): Double {
+        val key = normalizeTag(name)
+        val row = one("SELECT * FROM pantry WHERE item_key = ?", key)
+        val old = row?.dbl("quantity") ?: 0.0
+        val new = maxOf(0.0, setTo ?: (old + delta))
+        if (row == null) insert("pantry", mapOf("item_key" to key, "name" to name, "quantity" to new, "unit" to unit, "updated_at" to TimeUtil.iso(now)))
+        else exec("UPDATE pantry SET quantity = ?, unit = COALESCE(?, unit), updated_at = ? WHERE item_key = ?", new, unit, TimeUtil.iso(now), key)
+        insert("pantry_log", mapOf("item_key" to key, "change" to new - old, "reason" to reason, "occurred_at" to TimeUtil.iso(now),
+            "local_date" to date(now), "source_message_id" to msgId))
+        return new
+    }
+
+    fun pantryLog(sinceDay: String): List<Row> = query("SELECT * FROM pantry_log WHERE local_date >= ? ORDER BY occurred_at, id", sinceDay)
+
     // --------------------------------------------------------- body metrics
     fun addMetric(now: Instant, at: Instant, metric: String, value: Double, source: String, naturalKey: String? = null): Long? = try {
         insert(
